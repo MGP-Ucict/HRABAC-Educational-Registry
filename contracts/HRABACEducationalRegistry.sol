@@ -135,7 +135,7 @@ contract HRABACEducationalRegistry {
      */
     function addDiploma(address _student, bytes32 _diplomaHash) external onlyActiveRole(Role.Inspector) {
         require(_student != address(0), "Invalid student address");
-        require(users[_student].role == Role.Graduate, "Target address is not a registered Graduate");
+        //require(users[_student].role == Role.Graduate, "Target address is not a registered Graduate");
         require(diplomaToOwner[_diplomaHash] == address(0), "Diploma hash already registered in state");
 
         // Fixed-size key-value mapping storage operation
@@ -155,7 +155,6 @@ contract HRABACEducationalRegistry {
      */
     function verifyDiploma(address _studentAddress, bytes32 _calculatedHash) 
         external 
-        view 
         onlyActiveRole(Role.Employer) 
         returns (bool) 
     {

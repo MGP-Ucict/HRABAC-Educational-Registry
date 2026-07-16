@@ -28,7 +28,7 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
 
     // 2. Deploy contract, explicitly injecting the Inspector address into the constructor
     const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
-    registry = await RegistryFactory.deploy(inspector.address);
+    registry = await RegistryFactory.deploy(inspector);
     await registry.waitForDeployment();
 
     // 3. Complete basic institutional setup via the correct role lanes
@@ -110,7 +110,7 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
       await registry.connect(inspector).addDiploma(student.address, sampleDiplomaHash);
 
       // 2. Employer executes a direct key-value validation lookup
-      const isAuthentic = await registry.connect(employer).verifyDiploma(student.address, sampleDiplomaHash);
+      const isAuthentic = await registry.connect(employer).verifyDiploma.staticCall(student.address, sampleDiplomaHash);
       expect(isAuthentic).to.be.true;
     });
 
@@ -118,7 +118,7 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
       await registry.connect(inspector).addDiploma(student.address, sampleDiplomaHash);
 
       // Employer checks if the hash belongs to maliciousUser instead of the real student
-      const isAuthentic = await registry.connect(employer).verifyDiploma(maliciousUser.address, sampleDiplomaHash);
+      const isAuthentic = await registry.connect(employer).verifyDiploma.staticCall(maliciousUser.address, sampleDiplomaHash);
       expect(isAuthentic).to.be.false;
     });
   });
