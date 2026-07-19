@@ -7,57 +7,58 @@ describe("Gas Benchmark O(1)", function () {
   let admin, inspector, employer, student1;
 
   beforeEach(async function () {
-    // Вземаме тестовите акаунти от Hardhat
+    // Extracting mock test accounts from the Hardhat network provider
     [admin, inspector, employer, student1] = await ethers.getSigners();
 
-    // 1. Деплойваме вашия контракт (заменете името с истинското, ако е различно)
+    // 1. Deploying the HRABAC contract instance (with inspector initialization)
     const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
-    registry = await RegistryFactory.deploy(inspector);
+    registry = await RegistryFactory.deploy(inspector.address);
     await registry.waitForDeployment();
+    
+    // Initializing off-chain registry credentials and systemic trust parameters
     await registry.connect(admin).registerInspector(employer.address, 50005);
     await registry.connect(inspector).registerEmployer(employer.address, 40004);
   });
 
   it("Should prove O(1) complexity by checking gas cost with increasing data volume", async function () {
-    // Дефинираме стъпките за натоварване: 5, 10 и 20 дипломи в системата
-    const dataSizes = [5, 10, 20]; 
+    // Defining data scale increments: 1, 10, 50, 100, 200, and 1000 diplomas inside state storage
+    const dataSizes =; 
     let lastGasUsed = null;
 
-    // Генерираме РЕФЕРЕНТНАТА ДИПЛОМА, която ще проверяваме всеки път.
-    // Тя ще бъде закотвена в базата данни от самото начало.
+    // Generating the REFERENCE CREDENTIAL to be systematically verified across all iterations.
+    // This credential remains anchored in the ledger from the initialization stage.
     const targetStudent = student1.address;
     const targetHash = ethers.id("Target_Academic_Diploma_2026");
     
-    // Записваме я като първи запис (Базова линия)
+    // Committing the target entry into storage to serve as the baseline measurement
     await registry.connect(inspector).addDiploma(targetStudent, targetHash);
 
     console.log("\n--- START GAS BENCHMARK ---");
 
+    // Tracking the precise structural entries currently active in the blockchain storage mapping
+    let currentCount = 1; 
+
     for (let size of dataSizes) {
-      // 1. Изчисляваме колко "фалшиви" дипломи трябва да добавим, за да достигнем текущия размер (size)
-      // Намаляваме с 1, защото референтната диплома вече е вътре.
-      const currentCount = Number(1); 
+      // 1. Calculating the differential volume of dummy entries required to meet the current threshold size
       const itemsToAdd = size - currentCount;
 
-      // 2. Натрупваме обем от данни в Storage (Изкуствено раздуване на мапинга)
+      // 2. Storage Inflation Loop: Artificially expanding the EVM storage mapping state
       for (let i = 0; i < itemsToAdd; i++) {
         const fakeStudentWallet = ethers.Wallet.createRandom(); 
         const fakeHash = ethers.id(`Fake_Diploma_ID_${size}_${i}`); 
         await registry.connect(inspector).addDiploma(fakeStudentWallet.address, fakeHash);
+        currentCount++;
       }
 
-      // 3. ОФИЦИАЛНОТО ИЗМЕРВАНЕ: Извикваме проверката на ОРИГИНАЛНАТА диплома
-      // Тъй като verifyDiploma е view функция, за да генерираме реална разписка (Receipt) с газ,
-      // я извикваме през изпращане на трансакция (или ползваме estimateGas). 
-      // Изпращането като трансакция е най-сигурният начин да вземем точния EVM изпълнителен газ.
-      const tx = await registry.connect(employer).verifyDiploma(targetStudent, targetHash);
-      const receipt = await tx.wait();
+      // 3. CORE EMPIRICAL MEASUREMENT: Triggering validation on the baseline target credential.
+      // If verifyDiploma is a view function, we use estimateGas to isolate computational consumption.
+      // Alternatively, if it modifies state or returns an external tx, we trigger full mutable execution.
+      const gasUsed = await registry.connect(employer).verifyDiploma.estimateGas(targetStudent, targetHash);
       
-      const gasUsed = receipt.gasUsed;
       console.log(`Data Volume: ${size} diplomas in DB | Gas Used for verification: ${gasUsed.toString()} gas`);
 
-      // 4. НАУЧНА ПРОВЕРКА (Assertion): 
-      // Проверяваме дали газът при N=20 е ЕДНАКЪВ с този при N=5
+      // 4. ACADEMIC ASSERTION FOR O(1) INVARIANCE
+      // Verifying that computational gas overhead remains mathematically identical across variable storage scales
       if (lastGasUsed !== null) {
         expect(gasUsed).to.equal(lastGasUsed);
       }
@@ -65,6 +66,6 @@ describe("Gas Benchmark O(1)", function () {
     }
     
     console.log("--- END GAS BENCHMARK ---\n");
-    console.log(`📊 Научно доказателство: Тъй като делтата на газа е 0, сложността е твърдо O(1).`);
+    console.log(`📊 Empirical Proof: Since the gas delta is exactly 0 across all storage volumes, algorithmic complexity is strictly O(1).`);
   });
 });

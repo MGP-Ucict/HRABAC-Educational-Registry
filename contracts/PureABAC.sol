@@ -26,7 +26,7 @@ contract PureABAC {
         subjectRegistry[_subject] = SubjectAttributes(_role, _inst);
     }
 
-    function addDiploma(bytes32 _hash, string memory _inst) external {
+    function addDiploma(string memory _inst, bytes32 _hash) external {
         require(msg.sender == admin, "Only admin");
         diplomas.push(DiplomaAttributes(_hash, _inst, true));
     }
@@ -35,7 +35,7 @@ contract PureABAC {
      * @notice ABAC верификация с O(n) сложност.
      * @dev EVM е принуден да сравнява стрингови атрибути в динамичен цикъл.
      */
-    function verifyDiplomaABAC(bytes32 _targetHash) external view returns (bool) {
+    function verifyDiplomaABAC(bytes32 _targetHash) external returns (bool) {
         SubjectAttributes memory subAttr = subjectRegistry[msg.sender];
         
         // ABAC Правило: Само субекти с роля "Employer" или от същата институция имат право да четат

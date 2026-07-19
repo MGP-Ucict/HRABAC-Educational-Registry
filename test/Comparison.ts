@@ -2,84 +2,88 @@ import { expect } from "chai";
 import hre  from "hardhat";
 const { ethers } = await hre.network.create(); 
 
-describe("🛑 Демонстрация на критичен срив и Газ DoS лимит", function () {
+describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", function () {
   let abac, riskBac, hrabac;
   let admin, employer, student;
 
-  // ДЕФИНИРАНЕ НА КРИТИЧЕН ЛИМИТ ЗА СИГУРНОСТ
-  // В реалния Ethereum лимитът за цял блок е 30,000,000. 
-  // За нуждите на нашия лабораторен тест, поставяме критичен праг за една функция: 120,000 газ.
+  // DEFINING THE CRITICAL SECURITY BOUNDARY
+  // In the live Ethereum Mainnet, the block gas limit scales up to 30,000,000 units.
+  // For the deterministic scope of this laboratory benchmark, we define a strict 
+  // micro-threshold of 120,000 gas units per single state execution.
   const CRITICAL_GAS_THRESHOLD = 120000; 
 
   beforeEach(async function () {
     [admin, employer, student] = await ethers.getSigners();
 
-    abac = await (await ethers.getContractFactory("PureABAC")).deploy(admin);
-    riskBac = await (await ethers.getContractFactory("PureRiskBAC")).deploy(admin);
-    hrabac = await (await ethers.getContractFactory("HRABACEducationalRegistry")).deploy(admin);
+    // Deploying contract instances
+    abac = await (await ethers.getContractFactory("PureABAC")).deploy();
+    riskBac = await (await ethers.getContractFactory("PureRiskBAC")).deploy();
+    hrabac = await (await ethers.getContractFactory("HRABACEducationalRegistry")).deploy();
 
     await abac.waitForDeployment();
     await riskBac.waitForDeployment();
     await hrabac.waitForDeployment();
+    
+    // Initializing access control parameters and system attributes
     await hrabac.connect(admin).registerEmployer(employer.address, 50005);
     await hrabac.connect(admin).registerGraduate(student.address, 40004);
-    // Първоначална авторизация
     await abac.connect(admin).registerSubjectAttributes(employer.address, "Employer", "MoE");
   });
 
   // ------------------------------------------------------------------
-  // ДЕМОНСТРАЦИЯ 1: Как PureRiskBAC спира да работи (Логическо блокиране)
+  // DEMONSTRATION 1: PureRiskBAC Operational Lockout (Logical Failure)
   // ------------------------------------------------------------------
-  it("PureRiskBAC спира да работи за потребителя след 5 грешни стъпки", async function () {
+  it("PureRiskBAC undergoes operational lockout for the user after 5 failed authentication attempts", async function () {
     const targetHash = ethers.id("Real_Diploma_Hash");
     const wrongHash = ethers.id("Wrong_Diploma_Hash");
     await riskBac.connect(admin).addDiploma(targetHash, student.address, 20);
-    console.log("\n--- СИМУЛАЦИЯ НА СРИВ В RISKBAC ---");
+    
+    console.log("\n--- SIMULATING LOGICAL LOCKOUT IN RISKBAC ---");
 
     for (let i = 1; i <= 5; i++) {
       const tx = await riskBac.connect(employer).verifyDiplomaRiskBAC(wrongHash, student.address);
       await tx.wait();
-      console.log(`❌ Грешен опит #${i} регистриран в блокчейна.`);
+      console.log(`❌ Failed access attempt #${i} committed to the blockchain state.`);
     }
 
-    console.log("➡️ Опит за проверка на ИСТИНСКАТА диплома след натрупания риск...");
+    console.log("➡️ Attempting to verify the LEGITIMATE credential after risk escalation...");
     
+    // Evaluating state execution without sending a mutable transaction via staticCall
     const accessResult = await riskBac.connect(employer).verifyDiplomaRiskBAC.staticCall(targetHash, student.address);
-    console.log(`🚨 Резултат от проверката на истинската диплома: ${accessResult ? "РАБОТИ" : "БЛОКИРАН (Логически срив)"}`);
+    console.log(`🚨 Verification outcome for the legitimate credential: ${accessResult ? "OPERATIONAL" : "LOCKED OUT (Logical Crash)"}`);
     
     expect(accessResult).to.be.false; 
   });
 
   // ------------------------------------------------------------------
-  // ДЕМОНСТРАЦИЯ 2: Как PureABAC блокира заради Газ Експлозия (O(n) DoS)
+  // DEMONSTRATION 2: PureABAC Gas Explosion (O(N) Storage DoS Vulnerability)
   // ------------------------------------------------------------------
-  it("PureABAC преминава критичния лимит на сигурност и хвърля автоматична грешка", async function () {
+  it("PureABAC violates the critical gas threshold and triggers an automatic execution failure", async function () {
     const targetHash = ethers.id("Target_Hash_ABAC");
-    await abac.connect(admin).addDiploma(targetHash, "MoE");
+    await abac.connect(admin).addDiploma("MoE", targetHash); // Matching PureABAC.sol parameter order: (_inst, _hash)
 
-    console.log("\n--- СИМУЛАЦИЯ НА ГАЗ ЕКСПЛОЗИЯ В PUREABAC ---");
+    console.log("\n--- SIMULATING GAS EXPLOSION (DoS) IN PUREABAC ---");
     
-    // Постепенно добавяме 350 записа в масива, за да натоварим цикъла и да преминем прага
+    // Injecting 350 structural elements to inflate the storage array and trigger linear computation decay
     const recordsToInject = 350; 
-    console.log(`⏳ Инжектиране на ${recordsToInject} дипломи за раздуване на масива в PureABAC...`);
+    console.log(`⏳ Injecting ${recordsToInject} fake entries to induce worst-case loop traversal inside PureABAC...`);
     
     for (let i = 0; i < recordsToInject; i++) {
-      // Добавяме записи бързо на партиди
-      await abac.connect(admin).addDiploma(ethers.id(`Fake_${i}`), "Other");
+      await abac.connect(admin).addDiploma("Other", ethers.id(`Fake_${i}`));
     }
 
-    // Измерваме газа след умишленото натоварване
+    // Measuring exact EVM computational gas after targeted state expansion
     const finalGasABAC = Number(await abac.connect(employer).verifyDiplomaABAC.estimateGas(targetHash));
-    console.log(`⛽ Текущ разход на газ за PureABAC: ${finalGasABAC} units`);
-    console.log(`🛡️ Зададен критичен праг за сигурност: ${CRITICAL_GAS_THRESHOLD} units`);
+    console.log(`⛽ Measured EVM gas overhead for PureABAC: ${finalGasABAC} units`);
+    console.log(`🛡️ Defined Critical Safety Margin: ${CRITICAL_GAS_THRESHOLD} units`);
 
-    // АВТОМАТИЧНА СОФТУЕРНА ПРОВЕРКА ЗА СРИВ
+    // DETERMINISTIC SOFTWARE FAIL TRIGGER FOR RESEARCH VISUALIZATION
     if (finalGasABAC > CRITICAL_GAS_THRESHOLD) {
-      console.log(`\n🛑 [КРИТИЧНА ГРЕШКА]: Трансакцията в PureABAC беше ПРЕКЪСНАТА автоматично!`);
-      console.log(`⚠️ Причина: Разходът от ${finalGasABAC} газ надвиши лимита от ${CRITICAL_GAS_THRESHOLD}.`);
-      console.log(`💀 Системата е уязвима на Block Gas Limit Denial of Service (DoS) атака!`);
+      console.log(`\n🛑 [CRITICAL FAULT]: PureABAC execution TERMINATED automatically!`);
+      console.log(`⚠️ Reason: Computational overhead of ${finalGasABAC} gas units breached the safe threshold of ${CRITICAL_GAS_THRESHOLD}.`);
+      console.log(`💀 Architecture is highly vulnerable to Block Gas Limit Denial of Service (DoS) attacks!`);
       
-      // Хвърляме официален Chai Fail, за да счупим теста и да го демонстрираме нагледно
+      // Raising an explicit assertion failure to visually break the test suite for the research paper
       expect.fail(`PureABAC Gas Exhaustion detected: ${finalGasABAC} > ${CRITICAL_GAS_THRESHOLD}`);
     }
 
@@ -87,24 +91,24 @@ describe("🛑 Демонстрация на критичен срив и Газ
   });
 
   // ------------------------------------------------------------------
-  // ДЕМОНСТРАЦИЯ 3: Как HRABAC остава имунизиран при същите условия
+  // DEMONSTRATION 3: HRABAC Deterministic Immunity under identical strain
   // ------------------------------------------------------------------
-  it("HRABAC остава стабилен под същия обем натоварване без промяна в газа", async function () {
+  it("HRABAC maintains constant O(1) performance under identical storage strain with no gas fluctuations", async function () {
     const targetHash = ethers.id("Target_Hash_HRABAC");
     await hrabac.connect(admin).addDiploma(student.address, targetHash);
 
-    console.log("\n--- ПРОВЕРКА НА СТАБИЛНОСТТА НА HRABAC ---");
+    console.log("\n--- VERIFYING HRABAC ALGORITHMIC INVARIANCE ---");
     
-    // Добавяме абсолютно същия брой (350) фалшиви записи в HRABAC
+    // Injecting an identical load (350 records) into the HRABAC contract instance
     for (let i = 0; i < 350; i++) {
       await hrabac.connect(admin).addDiploma(ethers.Wallet.createRandom().address, ethers.id(`Fake_HR_${i}`));
     }
 
     const gasHRABAC = Number(await hrabac.connect(employer).verifyDiploma.estimateGas(student.address, targetHash));
-    console.log(`🟩 Разход на газ за HRABAC след натоварването: ${gasHRABAC} units`);
-    console.log(`🎯 Статус: Имунизиран срещу DoS. Разходът е далеч под критичния праг.`);
+    console.log(`🟩 Measured EVM gas overhead for HRABAC following storage inflation: ${gasHRABAC} units`);
+    console.log(`🎯 Status: Fully Immune to DoS attacks. Consumption remains well below the critical threshold.`);
 
-    // Проверяваме дали HRABAC е преминал теста успешно
+    // Asserting that HRABAC safely executes within the secure operational boundaries
     expect(gasHRABAC).to.be.lessThan(CRITICAL_GAS_THRESHOLD);
   });
 });
