@@ -1,58 +1,103 @@
-# Sample Hardhat 3 Project (`mocha` and `ethers`)
 
-This project showcases a Hardhat 3 project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+------------------------------
+## 🎓 HRABAC: A Privacy-Preserving and Scalability-Oriented Hybrid Access Control Registry
+This repository contains the official smart contract implementations, formal verification artifacts, and empirical gas benchmarking suites for the Deterministic Hybrid Role-Attribute Based Access Control (HRABAC) framework, as presented in the corresponding research paper.
+The core architecture breaks the performance-privacy trade-off in decentralized identity management by decoupling access pipelines into off-chain zero-trust contextual wrappers and an on-chain key-value mapping ledger structure, locking evaluation costs to a strict constant-time complexity $\mathcal{O}(1)$.
+------------------------------
+## 🏗️ Repository Architecture
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+├── contracts/
+│   ├── HRABACEducationalRegistry.sol # Proposed O(1) constant-time hybrid ledger core
+│   ├── PureABAC.sol                  # Benchmark baseline: Attribute-Based Access Control [O(n)]
+│   └── PureRiskBAC.sol               # Benchmark baseline: Risk-Based Access Control (Deadlock prone)
+├── test/
+│   ├── HRABACBenchmarks.ts           # Mass-scale stress-test up to 10,000 records (Proving O(1))
+│   ├── RiskBACBenchmarks.ts          # Adaptive telemetry and SSTORE/SLOAD mechanics evaluator
+|   |── ABACBenchmarks.ts             # Scaling stress-test up to 1000 records (Proving O(n))
+│   └── Comparison.ts                 # Targeted attack simulation (Exploding O(n) past safe safety limits)
+├── hardhat.config.js                 # EVM compilation configurations (Solc v0.8.20 + 200 optimization runs)
+├── package.json                      # Project dependencies (Hardhat, Ethers.js, Chai, Mocha)
+└── README.md                         # Repository orientation and replication manual
 
-## Project Overview
+------------------------------
+## ⚡ Quick Start & Installation## 1. Prerequisites
+Ensure you have [Node.js (v18.x or higher)](https://nodejs.org/) and npm installed.
+## 2. Clone and Dependency Setup
+Clone this repository and install the development packages:
 
-This example project includes:
+git clone https://github.com/MGP-Ucict/HRABAC-Educational-Registry.git
+cd hrabac-registry
+npm install
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+## 3. Compile Smart Contracts
+Compile the Solidity code using the configured Hardhat compiler:
 
-## Usage
+npx hardhat compile
 
-### Running Tests
+------------------------------
+## 📊 Running the Empirical Test & Security Suite
+The test infrastructure is segmented into three standalone simulation targets designed to empirically validate the paper's core claims.
+## 1. Execute proposed HRABAC O(1) Stress-Test
+Validates the flat execution baseline of exactly 27,727 gas across database depths expanding exponentially from 1 to 10,000 live storage items.
 
-To run all the tests in the project, execute the following command:
+npx hardhat test test/HRABACBenchmarks.ts
 
-```shell
-npx hardhat test
-```
+Expected Outcome: 1 passing (~1.5m) console confirmation showcasing uniform transaction price stability.
+## 2. Execute RiskBAC Dynamic Tracking Benchmark
+Measures the gas profile under variable behavioral and failure history inputs, logging dynamic metric updates.
 
-You can also selectively run the Solidity or `mocha` tests:
+npx hardhat test test/RiskBACBenchmarks.ts
 
-```shell
-npx hardhat test solidity
-npx hardhat test mocha
-```
+## 3. Execute Critical Vulnerability & Block Gas Limit DoS Simulation
+Injects 350 structural storage metrics to actively crash the PureABAC dynamic execution loops. This script tests the contract past the established micro-threshold boundary ($\tau_{\text{gas}} = 120,000$) to visually trigger software failures, while showing HRABAC immunity under identical strain.
 
-### Make a deployment to Sepolia
+npx hardhat test test/Comparison.ts
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
+Expected Outcome: Controlled compilation assertion fault (expect.fail) explicitly proving PureABAC susceptibility to contract bricking.
 
-To run the deployment to a local chain:
+## 🔬 PureABAC Algorithmic Decay Details
+The ABAC benchmarking suite is engineered to document performance breakdowns caused by iterative storage traversals.
 
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
-```
+npx hardhat test test/ABACBenchmarks.ts
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
+1. Worst-Case Setup: The target credential hash is pushed to the absolute end of the dynamic array, forcing the EVM loop to scan every single index to replicate an adversarial worst-case query.
+2. Volume-Induced Price Explosion: Every single iteration triggers expensive SLOAD opcodes. The console logs will outline the explicit linear progression:
+   - 1 Record   | 33,021 gas
+   - 10 Records  | 54,369 gas
+   - 100 Records | 267,849 gas
+   - 1000 Records| 2,402,649 gas
+3. Block Gas Limit Extrapolation: Projections confirm that scaling to a routine public volume (12,000 to 15,000 records) breaches the 30,000,000 Mainnet Block Gas Limit, triggering execution reverts and permanent contract bricking.
+------------------------------
+## 🛠️ Configuration Parameter Adjustments
+To prevent automated network testing exe
+------------------------------
+## 🛠️ Configuration Parameter Adjustments
+To prevent automated network testing execution limits from throwing timeout interruptions during mass batch array population (such as the 10,000 records pipeline), the timeout windows inside hardhat.config.js have been scaled up to 300,000 ms:
 
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
+module.exports = {
+  solidity: {
+    version: "0.8.20",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      }
+    }
+  },
+  mocha: {
+    timeout: 300000 // Extended limit prevents automated test suite truncation
+  }
+};
 
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
+------------------------------
+## 🔬 Core Empirical Results Summary
 
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-```
+| Access Control Model | Algorithmic Complexity | Baseline Verification Cost | Cost at 10,000 Records | Critical Security Risk |
+|---|---|---|---|---|
+| PureABAC | $\mathcal{O}(n)$ | 33,821 gas | Execution Reverted | Block Gas Limit DoS / Bricking |
+| PureRiskBAC | $\mathcal{O}(1)$ storage lookups | 54,955 gas | 54,955 gas | False-Positive Operational Lockouts |
+| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 27,727 gas | 27,727 gas | None (Fully Immune) |
 
-After setting the variable, you can run the deployment with the Sepolia network:
+------------------------------
 
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
-```
-"# HRABAC-Educational-Registry" 
+
