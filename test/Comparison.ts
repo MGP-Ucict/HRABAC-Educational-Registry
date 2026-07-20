@@ -4,7 +4,7 @@ const { ethers } = await hre.network.create();
 
 describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", function () {
   let abac, riskBac, hrabac;
-  let admin, employer, student;
+  let admin, inspector, employer, student;
 
   // DEFINING THE CRITICAL SECURITY BOUNDARY
   // In the live Ethereum Mainnet, the block gas limit scales up to 30,000,000 units.
@@ -13,45 +13,57 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   const CRITICAL_GAS_THRESHOLD = 120000; 
 
   beforeEach(async function () {
-    [admin, employer, student] = await ethers.getSigners();
+    [admin, inspector, employer, student] = await ethers.getSigners();
 
     // Deploying contract instances
     abac = await (await ethers.getContractFactory("PureABAC")).deploy();
     riskBac = await (await ethers.getContractFactory("PureRiskBAC")).deploy();
-    hrabac = await (await ethers.getContractFactory("HRABACEducationalRegistry")).deploy();
+    hrabac = await (await ethers.getContractFactory("HRABACEducationalRegistry")).deploy(inspector.address);
 
     await abac.waitForDeployment();
     await riskBac.waitForDeployment();
     await hrabac.waitForDeployment();
     
     // Initializing access control parameters and system attributes
-    await hrabac.connect(admin).registerEmployer(employer.address, 50005);
-    await hrabac.connect(admin).registerGraduate(student.address, 40004);
+    await hrabac.connect(admin).registerInspector(inspector.address, 50005);
+    await hrabac.connect(inspector).registerEmployer(employer.address, 40004);
+    await hrabac.connect(inspector).registerGraduate(student.address, 30003);
     await abac.connect(admin).registerSubjectAttributes(employer.address, "Employer", "MoE");
   });
 
   // ------------------------------------------------------------------
   // DEMONSTRATION 1: PureRiskBAC Operational Lockout (Logical Failure)
   // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
+  // DEMONSTRATION 1: PureRiskBAC Operational Lockout (Logical Failure)
+  // ------------------------------------------------------------------
   it("PureRiskBAC undergoes operational lockout for the user after 5 failed authentication attempts", async function () {
     const targetHash = ethers.id("Real_Diploma_Hash");
-    const wrongHash = ethers.id("Wrong_Diploma_Hash");
-    await riskBac.connect(admin).addDiploma(targetHash, student.address, 20);
+    
+    // 1. Add diploma with a strict security clearance of 30 (Risk limit: 100 - 30 = 70)
+    await riskBac.connect(admin).addDiploma(targetHash, student.address, 30);
+    
+    // 2. Initialize employer reputation to 100 to kickstart the baseline state
+    await riskBac.connect(admin).initializeReviewer(employer.address);
     
     console.log("\n--- SIMULATING LOGICAL LOCKOUT IN RISKBAC ---");
 
+    // 3. Trigger 5 sequential context mismatch failures (wrong student address) to escalate risk metrics
+    const wrongStudentAddress = ethers.Wallet.createRandom().address;
+    
     for (let i = 1; i <= 5; i++) {
-      const tx = await riskBac.connect(employer).verifyDiplomaRiskBAC(wrongHash, student.address);
+      const tx = await riskBac.connect(employer).verifyDiplomaRiskBAC(targetHash, wrongStudentAddress);
       await tx.wait();
       console.log(`❌ Failed access attempt #${i} committed to the blockchain state.`);
     }
 
     console.log("➡️ Attempting to verify the LEGITIMATE credential after risk escalation...");
     
-    // Evaluating state execution without sending a mutable transaction via staticCall
+    // 4. Evaluate access execution via staticCall to intercept the return value without reversing state
     const accessResult = await riskBac.connect(employer).verifyDiplomaRiskBAC.staticCall(targetHash, student.address);
     console.log(`🚨 Verification outcome for the legitimate credential: ${accessResult ? "OPERATIONAL" : "LOCKED OUT (Logical Crash)"}`);
     
+    // The assertion passes successfully because the engine traps itself in a permanent deadlock loop
     expect(accessResult).to.be.false; 
   });
 
@@ -95,13 +107,13 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   // ------------------------------------------------------------------
   it("HRABAC maintains constant O(1) performance under identical storage strain with no gas fluctuations", async function () {
     const targetHash = ethers.id("Target_Hash_HRABAC");
-    await hrabac.connect(admin).addDiploma(student.address, targetHash);
+    await hrabac.connect(inspector).addDiploma(student.address, targetHash);
 
     console.log("\n--- VERIFYING HRABAC ALGORITHMIC INVARIANCE ---");
     
     // Injecting an identical load (350 records) into the HRABAC contract instance
     for (let i = 0; i < 350; i++) {
-      await hrabac.connect(admin).addDiploma(ethers.Wallet.createRandom().address, ethers.id(`Fake_HR_${i}`));
+      await hrabac.connect(inspector).addDiploma(ethers.Wallet.createRandom().address, ethers.id(`Fake_HR_${i}`));
     }
 
     const gasHRABAC = Number(await hrabac.connect(employer).verifyDiploma.estimateGas(student.address, targetHash));

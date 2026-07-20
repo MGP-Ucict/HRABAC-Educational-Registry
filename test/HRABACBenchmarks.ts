@@ -16,15 +16,15 @@ describe("Gas Benchmark O(1)", function () {
     await registry.waitForDeployment();
     
     // Initializing off-chain registry credentials and systemic trust parameters
-    await registry.connect(admin).registerInspector(employer.address, 50005);
+    await registry.connect(admin).registerInspector(inspector.address, 50005);
     await registry.connect(inspector).registerEmployer(employer.address, 40004);
   });
 
   it("Should prove O(1) complexity by checking gas cost with increasing data volume", async function () {
     // Defining data scale increments: 1, 10, 50, 100, 200, and 1000 diplomas inside state storage
-    const dataSizes =; 
+    const dataSizes = [1, 10, 50, 100, 200, 1000, 10000]; 
     let lastGasUsed = null;
-
+    this.timeout(120000); 
     // Generating the REFERENCE CREDENTIAL to be systematically verified across all iterations.
     // This credential remains anchored in the ledger from the initialization stage.
     const targetStudent = student1.address;

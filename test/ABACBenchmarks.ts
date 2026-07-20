@@ -19,7 +19,7 @@ describe("Gas Benchmark O(N)", function () {
   });
 
   it("Should prove O(N) complexity by checking gas cost with increasing data volume", async function () {
-    const dataSizes =; 
+    const dataSizes = [1, 10, 50, 100, 200, 1000]; 
     let lastGasUsed = BigInt(0);
 
     const targetHash = ethers.id("Target_Academic_Diploma_2026");

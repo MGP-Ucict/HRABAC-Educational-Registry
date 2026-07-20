@@ -2,7 +2,7 @@ import { expect } from "chai";
 import hre  from "hardhat";
 const { ethers } = await hre.network.create(); 
 
-describe("Gas Benchmark Risk-BAC", function () {
+describe("Gas Benchmark RiskBAC", function () {
   let riskRegistry;
   let inspector, employer, student;
 
@@ -15,7 +15,7 @@ describe("Gas Benchmark Risk-BAC", function () {
     await riskRegistry.waitForDeployment();
   });
 
-  it("Should benchmark Risk-BAC gas behavior with varying risk factor history", async function () {
+  it("Should benchmark RiskBAC gas behavior with varying risk factor history", async function () {
     // Defining the historical load increments for the risk factor metric (number of failed access attempts)
     const riskLevels = [2, 3, 4, 5, 6]; 
     let lastGasUsed = BigInt(0);
@@ -41,13 +41,13 @@ describe("Gas Benchmark Risk-BAC", function () {
       await currentRiskRegistry.connect(inspector).addDiploma(targetHash, student.address, securityClearance);
 
       // 2. RISK HISTORY SIMULATION AND REPUTATION DECAY
-      // Artificially triggering failed access attempts for the target Employer to escalate their failedAttempts counter.
-      // This is accomplished by calling the function with a non-existent hash parameter, 
-      // which intentionally triggers the risk boundary check failure and updates the contract state slot.
-      const fakeHash = ethers.id("Non_Existent_Hash");
+      // Use the LEGITIMATE targetHash, but provide a WRONG student address (e.g., inspector.address)
+      // This bypasses the existence check but intentionally fails the identity match to escalate risk
+      const wrongStudentAddress = inspector.address; 
+      
       for (let i = 0; i < attempts; i++) {
         // Committing mutable state transactions to write the failure log into EVM storage
-        const txFail = await currentRiskRegistry.connect(employer).verifyDiplomaRiskBAC(fakeHash, student.address);
+        const txFail = await currentRiskRegistry.connect(employer).verifyDiplomaRiskBAC(targetHash, wrongStudentAddress);
         await txFail.wait();
       }
 
@@ -69,6 +69,6 @@ describe("Gas Benchmark Risk-BAC", function () {
     }
     
     console.log("--- END RISK-BAC GAS BENCHMARK ---\n");
-    console.log(`📊 Empirical Conclusion: While Risk-BAC retains O(1) storage lookup via mappings, it introduces significant computational gas overhead during dynamic risk calculations.`);
+    console.log(`📊 Empirical Conclusion: While Risk-BAC retains O(1) storage lookup via mappings, \n it introduces significant computational gas overhead during dynamic risk calculations.`);
   });
 });
