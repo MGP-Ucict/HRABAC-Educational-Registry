@@ -15,7 +15,7 @@ The core architecture breaks the performance-privacy trade-off in decentralized 
 ├── test/
 │   ├── HRABACBenchmarks.ts           # Mass-scale stress-test up to 10,000 records (Proving O(1))
 │   ├── RiskBACBenchmarks.ts          # Adaptive telemetry and SSTORE/SLOAD mechanics evaluator
-│   ├── ABACBenchmarks.ts             # Scaling stress-test up to 1,000 records (Proving O(n))
+│   ├── ABACBenchmarks.ts             # Stress-test up to 1,000 records (Proving O(n))
 │   └── Comparison.ts                 # Targeted attack simulation (Exploding O(n) past safe safety limits)
 ├── hardhat.config.js                 # EVM compilation configurations (Solc v0.8.20 + 200 optimization runs)
 ├── package.json                      # Project dependencies (Hardhat, Ethers.js, Chai, Mocha)
@@ -30,7 +30,7 @@ Ensure you have [Node.js (v18.x or higher)](https://nodejs.org/) and npm install
 Clone this repository and install the development packages:
 
 git clone https://github.com/MGP-Ucict/HRABAC-Educational-Registry.git
-cd hrabac-registry
+cd HRABAC-Educational-Registry
 npm install
 
 ## 3. Compile Smart Contracts
