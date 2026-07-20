@@ -83,9 +83,9 @@ npx hardhat test test/ABACBenchmarks.ts
 ------------------------------
 ## 🔬 Core Empirical Results Summary
 
-| Access Control Model | Algorithmic Complexity | Baseline Verification Cost | Cost at 10,000 Records | Critical Security Risk |
+| Access Control Model | Algorithmic Complexity | Baseline Verification Cost | Cost at 1000 Records | Critical Security Risk |
 |---|---|---|---|---|
-| PureABAC | $\mathcal{O}(n)$ | 33,821 gas | Execution Reverted | Block Gas Limit DoS / Bricking |
+| PureABAC | $\mathcal{O}(n)$ | 33,021 gas | 2,402,649 gas| Block Gas Limit DoS / Bricking |
 | PureRiskBAC | $\mathcal{O}(1)$ storage lookups | 38,272 gas | Not Evaluated (N/A) | False-Positive Operational Lockouts |
 | Proposed HRABAC | Strict $\mathcal{O}(1)$ | 27,727 gas | 27,727 gas | None (Fully Immune) |
 
