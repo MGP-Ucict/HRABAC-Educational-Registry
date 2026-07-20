@@ -1,10 +1,8 @@
 ------------------------------
 ## 🎓 HRABAC: A Privacy-Preserving and Scalability-Oriented Hybrid Access Control Registry
 
-```text
-This repository contains the official smart contract implementations, formal verification artifacts, and empirical gas benchmarking suites for the Deterministic Hybrid Role-Attribute Based Access Control (HRABAC) framework, as presented in the corresponding research paper.
+# This repository contains the official smart contract implementations, formal verification artifacts, and empirical gas benchmarking suites for the Deterministic Hybrid Role-Attribute Based Access Control (HRABAC) framework, as presented in the corresponding research paper.
 The core architecture breaks the performance-privacy trade-off in decentralized identity management by decoupling access pipelines into off-chain zero-trust contextual wrappers and an on-chain key-value mapping ledger structure, locking evaluation costs to a strict constant-time complexity \(\mathcal{O}(1)\).
-```
 ------------------------------
 ## 🏗️ Repository Architecture
 
@@ -68,7 +66,7 @@ npx hardhat test test/Comparison.ts
 
 Expected Outcome: Controlled compilation assertion fault (expect.fail) explicitly proving PureABAC susceptibility to contract bricking.
 
-## 🔬 PureABAC Algorithmic Decay Details
+## 4. PureABAC Algorithmic Decay Details
 
 The ABAC benchmarking suite is engineered to document performance breakdowns caused by iterative storage traversals.
 
