@@ -1,13 +1,14 @@
-
 ------------------------------
 ## 🎓 HRABAC: A Privacy-Preserving and Scalability-Oriented Hybrid Access Control Registry
-
+```
 This repository contains the official smart contract implementations, formal verification artifacts, and empirical gas benchmarking suites for the Deterministic Hybrid Role-Attribute Based Access Control (HRABAC) framework, as presented in the corresponding research paper.
-The core architecture breaks the performance-privacy trade-off in decentralized identity management by decoupling access pipelines into off-chain zero-trust contextual wrappers and an on-chain key-value mapping ledger structure, locking evaluation costs to a strict constant-time complexity $\mathcal{O}(1)$.
+The core architecture breaks the performance-privacy trade-off in decentralized identity management by decoupling access pipelines into off-chain zero-trust contextual wrappers and an on-chain key-value mapping ledger structure, locking evaluation costs to a strict constant-time complexity \(\mathcal{O}(1)\).
+```
 ------------------------------
 ## 🏗️ Repository Architecture
 
-
+```text
+.
 ├── contracts/
 │   ├── HRABACEducationalRegistry.sol # Proposed O(1) constant-time hybrid ledger core
 │   ├── PureABAC.sol                  # Benchmark baseline: Attribute-Based Access Control [O(n)]
@@ -15,11 +16,14 @@ The core architecture breaks the performance-privacy trade-off in decentralized 
 ├── test/
 │   ├── HRABACBenchmarks.ts           # Mass-scale stress-test up to 10,000 records (Proving O(1))
 │   ├── RiskBACBenchmarks.ts          # Adaptive telemetry and SSTORE/SLOAD mechanics evaluator
-|   |── ABACBenchmarks.ts             # Scaling stress-test up to 1000 records (Proving O(n))
+│   ├── ABACBenchmarks.ts             # Scaling stress-test up to 1,000 records (Proving O(n))
 │   └── Comparison.ts                 # Targeted attack simulation (Exploding O(n) past safe safety limits)
 ├── hardhat.config.js                 # EVM compilation configurations (Solc v0.8.20 + 200 optimization runs)
 ├── package.json                      # Project dependencies (Hardhat, Ethers.js, Chai, Mocha)
 └── README.md                         # Repository orientation and replication manual
+```
+
+------------------------------
 
 ------------------------------
 ## ⚡ Quick Start & Installation## 1. Prerequisites
