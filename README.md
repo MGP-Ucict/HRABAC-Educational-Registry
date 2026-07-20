@@ -1,9 +1,8 @@
 ------------------------------
 ## 🎓 HRABAC: A Privacy-Preserving and Scalability-Oriented Hybrid Access Control Registry
-```
+
 This repository contains the official smart contract implementations, formal verification artifacts, and empirical gas benchmarking suites for the Deterministic Hybrid Role-Attribute Based Access Control (HRABAC) framework, as presented in the corresponding research paper.
 The core architecture breaks the performance-privacy trade-off in decentralized identity management by decoupling access pipelines into off-chain zero-trust contextual wrappers and an on-chain key-value mapping ledger structure, locking evaluation costs to a strict constant-time complexity \(\mathcal{O}(1)\).
-```
 ------------------------------
 ## 🏗️ Repository Architecture
 
@@ -22,9 +21,6 @@ The core architecture breaks the performance-privacy trade-off in decentralized 
 ├── package.json                      # Project dependencies (Hardhat, Ethers.js, Chai, Mocha)
 └── README.md                         # Repository orientation and replication manual
 ```
-
-------------------------------
-
 ------------------------------
 ## ⚡ Quick Start & Installation## 1. Prerequisites
 
