@@ -31,6 +31,7 @@ Clone this repository and install the development packages:
 
 git clone https://github.com/MGP-Ucict/HRABAC-Educational-Registry.git
 cd HRABAC-Educational-Registry
+
 npm install
 
 ## 3. Compile Smart Contracts
