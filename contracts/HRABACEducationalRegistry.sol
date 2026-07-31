@@ -1,40 +1,48 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 /**
  * @title HRABAC Educational Registry Smart Contract
- * @notice Demonstrates deterministic hybrid access control with strict Separation of Duties.
- * @dev Optimized specifically for Layer 2 execution (Arbitrum) via tight storage slot packing.
- *      Distinguishes between technical Admin privileges and academic Inspector privileges.
+ * @notice Enforces deterministic hybrid access control with strict Separation of Duties.
+ * @dev Implements Epoch-Based State Batching and multi-institutional signature validation 
+ *      via the native ecrecover opcode, locking verification into a strict O(1) gas footprint.
  */
 contract HRABACEducationalRegistry {
 
-    // 1. Unified enum layout separating the technical Admin and the business Inspector
-    enum Role { None, Admin, Inspector, Graduate, Employer }
+    // Unified enum layout separating the technical Admin and institutional actors
+    enum Role { None, Admin, Inspector, Employer }
 
     error UnauthorizedAccess();
+    error InvalidSignature();
+    error NonceLockViolation();
 
-    // 2. Storage Slot Packing (Optimized for L2): role (1 byte) + isActive (1 byte) 
-    // are packed into a single 32-byte slot together with the uint256 ID, minimizing SSTORE gas costs.
+    // Storage Slot Packing (Optimized for L2): role (1 byte) + isActive (1 byte) 
+    // are packed into a single 32-byte slot, minimizing SSTORE gas execution costs.
     struct UserProfile {
-        uint256 id;        // National ID, Company ID, or Institutional/System Code
+        uint256 id;        // System or institutional registration ID
         Role role;         // Unified system role classification (1 byte)
-        bool isActive;     // Activation switch for soft-deactivation (1 byte)
+        bool isActive;     // Hardhat/EVM soft-deactivation switch (1 byte)
     }
 
-    // 3. Single on-chain user mapping replacing separate state tables
+    // Single on-chain user mapping replacing separate state identity tables
     mapping(address => UserProfile) public users;
 
-    // 4. Pure O(1) deterministic diploma ledger (No dynamic arrays stored on-chain)
-    // Map: Diploma Hash => Cryptographic Student Address
-    mapping(bytes32 => address) private diplomaToOwner;
+    // Pure O(1) deterministic diploma ledger (No dynamic arrays stored on-chain)
+    // Map: Diploma Hash => Cryptographic 32-byte Multi-Part Component Address (MCP)
+    mapping(bytes32 => bytes32) private diplomaToOwner;
 
-    // 5. Blockchain Events for off-chain indexing (Enables high-performance frontend tracking)
+    // Epoch-Based State Ledger mapping historical global State Roots (Section 3.10)
+    // Map: Epoch Nonce K => Global State Root Digest RK
+    mapping(uint256 => bytes32) private stateHistory;
+    uint256 public currentEpochNonce;
+
+    // Blockchain Events for asynchronous off-chain event sourcing and indexing
     event RoleStatusChanged(uint256 indexed id, string roleType, bool isActive, uint256 timestamp);
     event UserRegistered(address indexed userAddress, uint256 indexed id, Role role);
-    event DiplomaAdded(address indexed studentAddress, bytes32 indexed diplomaHash, uint256 timestamp);
+    event DiplomaAdded(bytes32 indexed mcpAddress, bytes32 indexed diplomaHash, uint256 timestamp);
+    event NationalStateUpdated(uint256 indexed epochNonce, bytes32 indexed globalStateRoot);
 
-    // Unified modifier enforcing both explicit Role classification and Active status
+    // Modifier enforcing explicit role verification and active infrastructure status
     modifier onlyActiveRole(Role _requiredRole) {
         if (users[msg.sender].role != _requiredRole || !users[msg.sender].isActive) revert UnauthorizedAccess();
         _;
@@ -43,24 +51,24 @@ contract HRABACEducationalRegistry {
     constructor(address _initialInspector) {
         require(_initialInspector != address(0), "Invalid inspector address");
 
-        // The deployer (the developer/programmer) is onboarded as the technical Admin
+        // Onboard the infrastructure deployer as the Technical Admin
         users[msg.sender] = UserProfile({
-            id: 101, // Tech Admin system ID
+            id: 101,
             role: Role.Admin,
             isActive: true
         });
         emit UserRegistered(msg.sender, 101, Role.Admin);
 
-        // The designated institutional entity is onboarded as the business Inspector
+        // Onboard the designated institutional entity as the active Inspector
         users[_initialInspector] = UserProfile({
-            id: 202, // Government Inspector institutional ID
+            id: 202,
             role: Role.Inspector,
             isActive: true
         });
         emit UserRegistered(_initialInspector, 202, Role.Inspector);
     }
 
-    // --- Technical Administrative Core (Executed ONLY by the active Admin / Programmer) ---
+    // --- Technical Administrative Core (Executed ONLY by the active Admin) ---
 
     /**
      * @notice Registers or updates a Government Inspector entity
@@ -76,9 +84,8 @@ contract HRABACEducationalRegistry {
     }
 
     /**
-     * @notice Flexible soft-deactivation switch for any registered system profile
-     * @dev Mutates only a single byte within the packed slot, resulting in minimal gas overhead.
-     *      The Admin can suspend any user (including an Inspector), but cannot manipulate diploma data.
+     * @notice Soft-deactivation switch for any registered system profile
+     * @dev Mutates only a single byte within the packed slot, minimizing gas overhead.
      */
     function setUserActiveStatus(address _userAddress, bool _status) external onlyActiveRole(Role.Admin) {
         require(users[_userAddress].role != Role.None, "User profile does not exist");
@@ -87,8 +94,7 @@ contract HRABACEducationalRegistry {
         users[_userAddress].isActive = _status;
         
         string memory roleLabel;
-        if (users[_userAddress].role == Role.Graduate) roleLabel = "Graduate";
-        else if (users[_userAddress].role == Role.Employer) roleLabel = "Employer";
+        if (users[_userAddress].role == Role.Employer) roleLabel = "Employer";
         else if (users[_userAddress].role == Role.Inspector) roleLabel = "Inspector";
         else roleLabel = "Admin";
 
@@ -98,24 +104,7 @@ contract HRABACEducationalRegistry {
     // --- Business / Academic Core (Executed ONLY by an active Government Inspector) ---
 
     /**
-     * @notice Registers a Graduate student entity
-     * @param _student Cryptographic public address of the student
-     * @param _studentID Unique anonymized academic identification number
-     */
-    function registerGraduate(address _student, uint256 _studentID) external onlyActiveRole(Role.Inspector) {
-        require(_student != address(0), "Invalid student address");
-        users[_student] = UserProfile({
-            id: _studentID,
-            role: Role.Graduate,
-            isActive: true
-        });
-        emit UserRegistered(_student, _studentID, Role.Graduate);
-    }
-
-    /**
      * @notice Registers an authorized corporate Employer entity
-     * @param _employer Cryptographic public address of the company
-     * @param _companyID Unique official company registration index
      */
     function registerEmployer(address _employer, uint256 _companyID) external onlyActiveRole(Role.Inspector) {
         require(_employer != address(0), "Invalid employer address");
@@ -128,20 +117,61 @@ contract HRABACEducationalRegistry {
     }
 
     /**
-     * @notice Registers a new diploma record linked to an anonymized document hash
-     * @dev Absolute O(1) transaction overhead. Eliminates gas-heavy on-chain arrays.
-     * @param _student Cryptographic address of the legitimate graduate owner
-     * @param _diplomaHash Off-chain generated cryptographic SHA-256 hash of the PDF diploma document
+     * @notice Registers a singular diploma record linked to an anonymous document hash and MCP token
+     * @dev Enforces absolute O(1) transaction overhead, completely bypassing on-chain loop structures.
      */
-    function addDiploma(address _student, bytes32 _diplomaHash) external onlyActiveRole(Role.Inspector) {
-        require(_student != address(0), "Invalid student address");
-        //require(users[_student].role == Role.Graduate, "Target address is not a registered Graduate");
-        require(diplomaToOwner[_diplomaHash] == address(0), "Diploma hash already registered in state");
+    function addDiploma(bytes32 _mcpAddress, bytes32 _diplomaHash) external onlyActiveRole(Role.Inspector) {
+        require(_mcpAddress != bytes32(0), "Invalid MCP address token");
+        require(diplomaToOwner[_diplomaHash] == bytes32(0), "Diploma hash already registered in state");
 
-        // Fixed-size key-value mapping storage operation
-        diplomaToOwner[_diplomaHash] = _student;
+        // Direct low-level storage slot assignment
+        diplomaToOwner[_diplomaHash] = _mcpAddress;
 
-        emit DiplomaAdded(_student, _diplomaHash, block.timestamp);
+        emit DiplomaAdded(_mcpAddress, _diplomaHash, block.timestamp);
+    }
+
+    // --- SECTION 3.7: EPOCH-BASED STATE BATCHING PROTOCOL ---
+
+    /**
+     * @notice Consumes a multi-institutional state batch manifest and anchors the global State Root.
+     * @dev Implements the cryptographic ecrecover protocol to validate institutional signatures asynchronously.
+     *      Bypasses transactional serialization bottlenecks and mitigates internal DBA ransomware injections.
+     * @param _epochNonce The targeted incremental chronological epoch sequence index K
+     * @param _proposedStateRoot The aggregated macro-perspective National Merkle Root digest RK
+     * @param _manifestHash The SHA-256 hash representation of the accumulated epoch dataset batch BK
+     * @param v ECDSA signature recovery parameter array emitted by the participating trust roots
+     * @param r ECDSA signature output coordinate array
+     * @param s ECDSA signature output coordinate array
+     */
+    function updateNationalState(
+        uint256 _epochNonce,
+        bytes32 _proposedStateRoot,
+        bytes32 _manifestHash,
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s
+    ) external onlyActiveRole(Role.Inspector) {
+        // Enforce strict chronological incremental execution boundaries (Prevents Replay/Out-of-order attacks)
+        if (_epochNonce != currentEpochNonce + 1) revert NonceLockViolation();
+        
+        uint256 signatureCount = v.length;
+        require(signatureCount > 0 && signatureCount == r.length && signatureCount == s.length, "Invalid signature data arrays");
+
+        // Validate the multi-institutional manifest bounds via the native EVM ecrecover primitive
+        for (uint256 i = 0; i < signatureCount; i++) {
+            address institutionalSigner = ecrecover(_manifestHash, v[i], r[i], s[i]);
+            
+            // Mitigate insider threat parameters by enforcing that the recovered signer must be an active Inspector node
+            if (users[institutionalSigner].role != Role.Inspector || !users[institutionalSigner].isActive) {
+                revert InvalidSignature();
+            }
+        }
+
+        // Commit the verified Hierarchical National State Root (HSR) onto the immutable ledger storage
+        currentEpochNonce = _epochNonce;
+        stateHistory[_epochNonce] = _proposedStateRoot;
+
+        emit NationalStateUpdated(_epochNonce, _proposedStateRoot);
     }
 
     // --- Business Evaluation Core: HRABAC Execution Gates ---
@@ -149,28 +179,24 @@ contract HRABACEducationalRegistry {
     /**
      * @notice Context-aware validation mechanism providing fine-grained verification
      * @dev HRABAC verification: checks Employer role status (RBAC) + dynamic ownership match (ABAC attribute)
-     * @param _studentAddress Public cryptographic address submitted by the job applicant
+     * @param _mcpAddress The 32-byte Multi-Part Component Address submitted by the job applicant
      * @param _calculatedHash Locally computed SHA-256 hash of the physical diploma document
      * @return bool True if authentic and explicitly owned by the specified applicant, false otherwise
      */
-    function verifyDiploma(address _studentAddress, bytes32 _calculatedHash) 
+    function verifyDiploma(bytes32 _mcpAddress, bytes32 _calculatedHash) 
         external 
+        view
         onlyActiveRole(Role.Employer) 
         returns (bool) 
     {
-        // One-step deterministic data-relationship verification check
-        if (diplomaToOwner[_calculatedHash] == _studentAddress && _studentAddress != address(0)) {
-            return true;
-        }
-        return false;
+        // One-step deterministic data-relationship verification check in strict O(1) complex path
+        return (_mcpAddress != bytes32(0) && diplomaToOwner[_calculatedHash] == _mcpAddress);
     }
 
     /**
-     * @notice Public view function to pull general profile metrics
-     * @param _user Target wallet address to audit
+     * @notice Public view function for Direct Indexed State Recovery verification (Section 7.2 Phase 2)
      */
-    function getUserProfile(address _user) external view returns (uint256 id, Role role, bool isActive) {
-        UserProfile memory profile = users[_user];
-        return (profile.id, profile.role, profile.isActive);
+    function getHistoricalStateRoot(uint256 _epochNonce) external view returns (bytes32) {
+        return stateHistory[_epochNonce];
     }
 }

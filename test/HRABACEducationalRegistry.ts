@@ -9,14 +9,16 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
   let student: any;
   let employer: any;
   let maliciousUser: any;
+  
+  let studentMcpAddress: string;
+  let maliciousMcpAddress: string;
 
-  // Exact mappings from the Solidity contract Enums
+  // Exact mappings from the updated Solidity contract Enums (Graduate role decoupled off-chain)
   const Role = {
     None: 0,
     Admin: 1,
     Inspector: 2,
-    Graduate: 3,
-    Employer: 4
+    Employer: 3
   };
 
   // Mock document hash representing a PDF diploma
@@ -26,25 +28,29 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
     // 1. Fetch distinct infrastructure accounts
     [admin, inspector, student, employer, maliciousUser] = await ethers.getSigners();
 
+    // Generate high-entropy 32-byte MCP Address tokens for the test configurations
+    studentMcpAddress = ethers.id("Student_Static_MCP_Address");
+    maliciousMcpAddress = ethers.id("Malicious_Static_MCP_Address");
+
     // 2. Deploy contract, explicitly injecting the Inspector address into the constructor
     const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
-    registry = await RegistryFactory.deploy(inspector);
+    registry = await RegistryFactory.deploy(inspector.address);
     await registry.waitForDeployment();
 
     // 3. Complete basic institutional setup via the correct role lanes
     // Admin registers an additional profile setup if necessary, Inspector registers business roles
-    await registry.connect(inspector).registerGraduate(student.address, 10001);
-    await registry.connect(inspector).registerEmployer(employer.address, 50005);
+    await registry.connect(admin).registerInspector(inspector.address, 50005);
+    await registry.connect(inspector).registerEmployer(employer.address, 40004);
   });
 
   // --- SCENARIO 1: Strict Role Verification during Deployment ---
   describe("Deployment & Initialization Verification", function () {
     it("Should correctly assign Admin role to the deployer and Inspector role to the target address", async function () {
-      const adminProfile = await registry.getUserProfile(admin.address);
+      const adminProfile = await registry.users(admin.address);
       expect(adminProfile.role).to.equal(Role.Admin);
       expect(adminProfile.isActive).to.be.true;
 
-      const inspectorProfile = await registry.getUserProfile(inspector.address);
+      const inspectorProfile = await registry.users(inspector.address);
       expect(inspectorProfile.role).to.equal(Role.Inspector);
       expect(inspectorProfile.isActive).to.be.true;
     });
@@ -52,17 +58,10 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
 
   // --- SCENARIO 2: Testing Admin Constraint Boundaries (The Programmer cannot act as an Academic entity) ---
   describe("Admin Boundary Enforcement (Separation of Duties)", function () {
-    it("Should reject an Admin attempt to register a graduate student", async function () {
-      // Admin tries to register a new student (Should fail because only Inspector is authorized)
-      await expect(
-        registry.connect(admin).registerGraduate(maliciousUser.address, 99999)
-      ).to.be.revertedWithCustomError(registry, "UnauthorizedAccess");
-    });
-
     it("Should reject an Admin attempt to add a diploma hash", async function () {
-      // Crucial test for security audit: Programmer tries to bypass business state logic
+      // Crucial test for security audit: Programmer tries to bypass business state logic using MCP token
       await expect(
-        registry.connect(admin).addDiploma(student.address, sampleDiplomaHash)
+        registry.connect(admin).addDiploma(studentMcpAddress, sampleDiplomaHash)
       ).to.be.revertedWithCustomError(registry, "UnauthorizedAccess");
     });
 
@@ -72,16 +71,16 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
         .to.emit(registry, "RoleStatusChanged");
 
       // Verify the status was mutated in storage slot layout
-      const inspectorProfile = await registry.getUserProfile(inspector.address);
+      const inspectorProfile = await registry.users(inspector.address);
       expect(inspectorProfile.isActive).to.be.false;
     });
   });
 
   // --- SCENARIO 3: Testing Inspector Constraint Boundaries (The Academic entity cannot manipulate configuration) ---
   describe("Inspector Boundary Enforcement", function () {
-    it("Should allow an active Inspector to issue a valid diploma", async function () {
-      // Valid business workflow path execution
-      await expect(registry.connect(inspector).addDiploma(student.address, sampleDiplomaHash))
+    it("Should allow an active Inspector to issue a valid diploma via MCP routing", async function () {
+      // Valid business workflow path execution using bytes32 tokens
+      await expect(registry.connect(inspector).addDiploma(studentMcpAddress, sampleDiplomaHash))
         .to.emit(registry, "DiplomaAdded");
     });
 
@@ -91,14 +90,14 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
 
       // Inactive Inspector tries to add data -> Must trigger immediate execution revert
       await expect(
-        registry.connect(inspector).addDiploma(student.address, sampleDiplomaHash)
+        registry.connect(inspector).addDiploma(studentMcpAddress, sampleDiplomaHash)
       ).to.be.revertedWithCustomError(registry, "UnauthorizedAccess");
     });
 
     it("Should reject an Inspector attempt to modify user active flags", async function () {
       // Inspector tries to override technical settings (Should fail because it is an Admin-only job)
       await expect(
-        registry.connect(inspector).setUserActiveStatus(student.address, false)
+        registry.connect(inspector).setUserActiveStatus(employer.address, false)
       ).to.be.revertedWithCustomError(registry, "UnauthorizedAccess");
     });
   });
@@ -106,19 +105,19 @@ describe("HRABACEducationalRegistry - Separation of Duties Tests", function () {
   // --- SCENARIO 4: HRABAC Verification Mechanism (Employer evaluation path) ---
   describe("HRABAC Verification Path", function () {
     it("Should successfully authorize a valid student diploma match when queried by a registered Employer", async function () {
-      // 1. Inspector adds the diploma hash onto the ledger stack
-      await registry.connect(inspector).addDiploma(student.address, sampleDiplomaHash);
+      // 1. Inspector adds the diploma hash onto the ledger stack linked to the MCP Address
+      await registry.connect(inspector).addDiploma(studentMcpAddress, sampleDiplomaHash);
 
-      // 2. Employer executes a direct key-value validation lookup
-      const isAuthentic = await registry.connect(employer).verifyDiploma.staticCall(student.address, sampleDiplomaHash);
+      // 2. Employer executes a direct key-value validation lookup in strict O(1)
+      const isAuthentic = await registry.connect(employer).verifyDiploma.staticCall(studentMcpAddress, sampleDiplomaHash);
       expect(isAuthentic).to.be.true;
     });
 
     it("Should return false if an Employer evaluates a mismatched student-to-hash relationship", async function () {
-      await registry.connect(inspector).addDiploma(student.address, sampleDiplomaHash);
+      await registry.connect(inspector).addDiploma(studentMcpAddress, sampleDiplomaHash);
 
-      // Employer checks if the hash belongs to maliciousUser instead of the real student
-      const isAuthentic = await registry.connect(employer).verifyDiploma.staticCall(maliciousUser.address, sampleDiplomaHash);
+      // Employer checks if the hash belongs to maliciousMcpAddress instead of the real student token
+      const isAuthentic = await registry.connect(employer).verifyDiploma.staticCall(maliciousMcpAddress, sampleDiplomaHash);
       expect(isAuthentic).to.be.false;
     });
   });

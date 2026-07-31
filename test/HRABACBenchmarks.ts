@@ -21,17 +21,18 @@ describe("Gas Benchmark O(1)", function () {
   });
 
   it("Should prove O(1) complexity by checking gas cost with increasing data volume", async function () {
-    // Defining data scale increments: 1, 10, 50, 100, 200, and 1000 diplomas inside state storage
+    // Defining data scale increments: 001, 10, 50, 100, 200, 1000, and 10000 diplomas inside state storage
     const dataSizes = [1, 10, 50, 100, 200, 1000, 10000]; 
     let lastGasUsed = null;
-    this.timeout(120000); 
+    this.timeout(240000); // Expanded timeout bound to accommodate intensive 10k EVM storage transitions
+    
     // Generating the REFERENCE CREDENTIAL to be systematically verified across all iterations.
-    // This credential remains anchored in the ledger from the initialization stage.
-    const targetStudent = student1.address;
+    // Transitioned from raw wallet address to a secure, static 32-byte MCP Address token.
+    const targetStudentMcp = ethers.id("Target_Student_Static_MCP_Token");
     const targetHash = ethers.id("Target_Academic_Diploma_2026");
     
     // Committing the target entry into storage to serve as the baseline measurement
-    await registry.connect(inspector).addDiploma(targetStudent, targetHash);
+    await registry.connect(inspector).addDiploma(targetStudentMcp, targetHash);
 
     console.log("\n--- START GAS BENCHMARK ---");
 
@@ -42,18 +43,18 @@ describe("Gas Benchmark O(1)", function () {
       // 1. Calculating the differential volume of dummy entries required to meet the current threshold size
       const itemsToAdd = size - currentCount;
 
-      // 2. Storage Inflation Loop: Artificially expanding the EVM storage mapping state
+      // 2. Storage Inflation Loop: Artificially expanding the EVM mapping layout (mapping(bytes32 => bytes32))
       for (let i = 0; i < itemsToAdd; i++) {
-        const fakeStudentWallet = ethers.Wallet.createRandom(); 
-        const fakeHash = ethers.id(`Fake_Diploma_ID_${size}_${i}`); 
-        await registry.connect(inspector).addDiploma(fakeStudentWallet.address, fakeHash);
+        // Generating random keys under packed bytes32 representations to prevent enterprise address leakage
+        const fakeStudentMcp = ethers.id(`Fake_MCP_Token_${size}_${i}`); 
+        const fakeHash = ethers.id(`Fake_Diploma_Hash_${size}_${i}`); 
+        await registry.connect(inspector).addDiploma(fakeStudentMcp, fakeHash);
         currentCount++;
       }
 
       // 3. CORE EMPIRICAL MEASUREMENT: Triggering validation on the baseline target credential.
-      // If verifyDiploma is a view function, we use estimateGas to isolate computational consumption.
-      // Alternatively, if it modifies state or returns an external tx, we trigger full mutable execution.
-      const gasUsed = await registry.connect(employer).verifyDiploma.estimateGas(targetStudent, targetHash);
+      // Evaluates the updated verifyDiploma schema using the 32-byte MCP token logic wrapper.
+      const gasUsed = await registry.connect(employer).verifyDiploma.estimateGas(targetStudentMcp, targetHash);
       
       console.log(`Data Volume: ${size} diplomas in DB | Gas Used for verification: ${gasUsed.toString()} gas`);
 

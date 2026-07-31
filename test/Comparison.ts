@@ -4,7 +4,7 @@ const { ethers } = await hre.network.create();
 
 describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", function () {
   let abac, riskBac, hrabac;
-  let admin, inspector, employer, student;
+  let admin, inspector, employer, student, studentMcpAddress;
 
   // DEFINING THE CRITICAL SECURITY BOUNDARY
   // In the live Ethereum Mainnet, the block gas limit scales up to 30,000,000 units.
@@ -12,10 +12,13 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   // micro-threshold of 120,000 gas units per single state execution.
   const CRITICAL_GAS_THRESHOLD = 120000; 
 
-  beforeEach(async function () {
+     beforeEach(async function () {
     [admin, inspector, employer, student] = await ethers.getSigners();
 
-    // Deploying contract instances
+    // 1. Generate the non-linear, high-entropy 32-byte MCP Address for the test student configuration
+    studentMcpAddress = ethers.id("Student_Static_MCP_Address");
+
+    // 2. Deploying contract instances into the local Hardhat EVM architecture
     abac = await (await ethers.getContractFactory("PureABAC")).deploy();
     riskBac = await (await ethers.getContractFactory("PureRiskBAC")).deploy();
     hrabac = await (await ethers.getContractFactory("HRABACEducationalRegistry")).deploy(inspector.address);
@@ -24,12 +27,17 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     await riskBac.waitForDeployment();
     await hrabac.waitForDeployment();
     
-    // Initializing access control parameters and system attributes
+    // 3. Initializing access control parameters and system attributes for HRABAC (bytes32 architecture)
     await hrabac.connect(admin).registerInspector(inspector.address, 50005);
     await hrabac.connect(inspector).registerEmployer(employer.address, 40004);
-    await hrabac.connect(inspector).registerGraduate(student.address, 30003);
+    
+    // === CRITICAL FIX: The line hrabac.registerGraduate(...) has been completely removed ===
+    // This is because student identity mapping is now entirely decoupled off-chain to prevent identity leaks.
+
+    // 4. Initializing legacy baseline contracts attributes (Using standard raw Ethereum addresses)
     await abac.connect(admin).registerSubjectAttributes(employer.address, "Employer", "MoE");
   });
+
 
   // ------------------------------------------------------------------
   // DEMONSTRATION 1: PureRiskBAC Operational Lockout (Logical Failure)
@@ -107,16 +115,18 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   // ------------------------------------------------------------------
   it("HRABAC maintains constant O(1) performance under identical storage strain with no gas fluctuations", async function () {
     const targetHash = ethers.id("Target_Hash_HRABAC");
-    await hrabac.connect(inspector).addDiploma(student.address, targetHash);
+    await hrabac.connect(inspector).addDiploma(studentMcpAddress, targetHash);
 
     console.log("\n--- VERIFYING HRABAC ALGORITHMIC INVARIANCE ---");
     
     // Injecting an identical load (350 records) into the HRABAC contract instance
-    for (let i = 0; i < 350; i++) {
-      await hrabac.connect(inspector).addDiploma(ethers.Wallet.createRandom().address, ethers.id(`Fake_HR_${i}`));
+     for (let i = 0; i < 350; i++) {
+      const randomFakeMcp = ethers.id(`Fake_MCP_Identity_${i}`);
+      const randomFakeHash = ethers.id(`Fake_HR_Diploma_${i}`);
+      await hrabac.connect(inspector).addDiploma(randomFakeMcp, randomFakeHash);
     }
 
-    const gasHRABAC = Number(await hrabac.connect(employer).verifyDiploma.estimateGas(student.address, targetHash));
+     const gasHRABAC = Number(await hrabac.connect(employer).verifyDiploma.estimateGas(studentMcpAddress, targetHash));
     console.log(`🟩 Measured EVM gas overhead for HRABAC following storage inflation: ${gasHRABAC} units`);
     console.log(`🎯 Status: Fully Immune to DoS attacks. Consumption remains well below the critical threshold.`);
 
