@@ -15,7 +15,7 @@ describe("Gas Benchmark RiskBAC", function () {
     await riskRegistry.waitForDeployment();
   });
 
-  it("Should benchmark RiskBAC gas behavior with varying risk factor history", async function () {
+  it("Should benchmark RiskBAC gas behavior with varying \n\t risk factor history", async function () {
     // Defining the historical load increments for the risk factor metric (number of failed access attempts)
     const riskLevels = [2, 3, 4, 5, 6]; 
     let lastGasUsed = BigInt(0);
@@ -69,6 +69,6 @@ describe("Gas Benchmark RiskBAC", function () {
     }
     
     console.log("--- END RISK-BAC GAS BENCHMARK ---\n");
-    console.log(`📊 Empirical Conclusion: While Risk-BAC retains O(1) storage lookup via mappings, \n it introduces significant computational gas overhead during dynamic risk calculations.`);
+    console.log(`📊 Empirical Conclusion: While Risk-BAC retains O(1) storage lookup \n\t via mappings, it introduces significant computational \n\t gas overhead during dynamic risk calculations.`);
   });
 });

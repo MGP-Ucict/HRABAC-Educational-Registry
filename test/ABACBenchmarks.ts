@@ -18,7 +18,7 @@ describe("Gas Benchmark O(N)", function () {
     await registry.connect(admin).registerSubjectAttributes(employer.address, "Employer", "MoE");
   });
 
-  it("Should prove O(N) complexity by checking gas cost with increasing data volume", async function () {
+  it("Should prove O(N) complexity by checking gas cost with\n\t increasing data volume", async function () {
     const dataSizes = [1, 10, 50, 100, 200, 1000]; 
     let lastGasUsed = BigInt(0);
 
@@ -66,6 +66,6 @@ describe("Gas Benchmark O(N)", function () {
     }
     
     console.log("--- END GAS BENCHMARK ---\n");
-    console.log(`📊 Empirical Evidence: The gas delta scales linearly with data volume, confirming a strict O(N) algorithmic complexity.`);
+    console.log(`📊 Empirical Evidence: The gas delta scales linearly with data volume,\n\t confirming a strict O(N) algorithmic complexity.`);
   });
 });
