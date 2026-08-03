@@ -1,40 +1,43 @@
-import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
-import { configVariable, defineConfig } from "hardhat/config";
+import { defineConfig } from "hardhat/config";
+// Import the plugin definition object directly from the package
+import toolboxPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 
 export default defineConfig({
+  // FIX: Pass the imported plugin definition object instead of a raw string
   plugins: [
-    hardhatToolboxMochaEthersPlugin, 
+    toolboxPlugin
   ],
+
   solidity: {
-    profiles: {
-      default: {
-        version: "0.8.28",
+    version: "0.8.24",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 999999,
+        details: {
+          yul: true,
+          yulDetails: {
+            stackAllocation: true,
+            optimizerSteps: "u:"
+          }
+        }
       },
-      production: {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
-      },
+      evmVersion: "cancun"
     },
   },
+  
+  // Explicitly mapping the test environment directories for the Mocha runner
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts"
+  },
+
   networks: {
-    hardhatMainnet: {
+    hardhat: {
       type: "edr-simulated",
-      chainType: "l1",
-    },
-    hardhatOp: {
-      type: "edr-simulated",
-      chainType: "op",
-    },
-    sepolia: {
-      type: "http",
-      chainType: "l1",
-      url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+      blockGasLimit: 30000000,
     },
   },
 });
