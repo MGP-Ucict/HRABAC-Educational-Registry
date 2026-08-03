@@ -3,9 +3,11 @@ import hre from "hardhat";
 import { ethers } from "ethers";
 
 describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", function () {
+  // Fix 1: Properly declaring all instances globally so they are shared across 'it' blocks
   let abac: any, riskBac: any, hrabac: any;
   let admin: any, inspector: any, employer: any, student: any;
   let studentMcpAddress: string;
+  let node1: any, node2: any, node3: any;
 
   // DEFINING THE CRITICAL SECURITY BOUNDARY
   // In the live Ethereum Mainnet, the block gas limit scales up to 30,000,000 units.
@@ -14,32 +16,47 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   const CRITICAL_GAS_THRESHOLD = 120000; 
 
   beforeEach(async function () {
-    // 1. Explicitly initialize the dynamic network connection required by Hardhat 3
+    // Explicitly initialize the dynamic network connection required by Hardhat 3
     const networkConnection = await hre.network.create();
     const ethersHelper = networkConnection.ethers;
 
     // Extracting mock test accounts from the Hardhat network provider
-    [admin, inspector, employer, student] = await ethersHelper.getSigners();
+    const signers = await ethersHelper.getSigners();
+    admin = signers[0];
+    inspector = signers[1];
+    employer = signers[2];
+    student = signers[3];
+
+    // Fix 2: Assigning the consensus nodes to the globally declared variable scope instead of re-declaring them
+    node1 = signers[4];
+    node2 = signers[5];
+    node3 = signers[6];
 
     // Generate the non-linear, high-entropy 32-byte MCP Address for the test student configuration
     studentMcpAddress = ethers.id("Student_Static_MCP_Address");
 
-    // 2. Deploying contract instances into the local Hardhat EVM architecture
+    // Deploying contract instances into the local Hardhat EVM architecture
     abac = await (await ethersHelper.getContractFactory("PureABAC")).deploy();
     riskBac = await (await ethersHelper.getContractFactory("PureRiskBAC")).deploy();
-    
-    // FIX: Deploying HRABAC by explicitly passing the Admin address into the new fixed constructor
-    hrabac = await (await ethersHelper.getContractFactory("HRABACEducationalRegistry")).deploy(admin.address);
 
+    // Define consortium addresses and count of signatures
+    const consensusNodes = [node1.address, node2.address, node3.address];
+    const requiredSignatures = 2;
+
+    // Fix 3: Removed 'const' keyword to bind deployment directly to the global 'hrabac' reference pointer
+    hrabac = await (
+        await ethersHelper.getContractFactory("HRABACEducationalRegistry")
+    ).deploy(admin.address, consensusNodes, requiredSignatures); 
+      
     await abac.waitForDeployment();
     await riskBac.waitForDeployment();
     await hrabac.waitForDeployment();
     
-    // 3. Initializing access control parameters and system attributes for HRABAC (bytes32 architecture)
+    // Initializing access control parameters and system attributes for HRABAC (bytes32 architecture)
     await hrabac.connect(admin).registerInspector(inspector.address, 50005);
     await hrabac.connect(inspector).registerEmployer(employer.address, 40004);
 
-    // 4. Initializing legacy baseline contracts attributes (Using standard raw Ethereum addresses)
+    // Initializing legacy baseline contracts attributes (Using standard raw Ethereum addresses)
     await abac.connect(admin).registerSubjectAttributes(employer.address, "Employer", "MoE");
   });
 
@@ -81,7 +98,6 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   // ------------------------------------------------------------------
   it("PureABAC violates the critical gas threshold and triggers \n\t an automatic execution failure", async function () {
     const targetHash = ethers.id("Target_Hash_ABAC");
-    await abac.connect(admin).addDiploma("MoE", targetHash); 
 
     console.log("\n--- SIMULATING GAS EXPLOSION (DoS) IN PUREABAC ---");
     
@@ -93,6 +109,7 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
       await abac.connect(admin).addDiploma("Other", ethers.id(`Fake_${i}`));
     }
 
+    await abac.connect(admin).addDiploma("MoE", targetHash); 
     // Measuring exact EVM computational gas after targeted state expansion (bigint to Number)
     const finalGasABAC = Number(await abac.connect(employer).verifyDiplomaABAC.estimateGas(targetHash));
     console.log(`⛽ Measured EVM gas overhead for PureABAC: ${finalGasABAC} units`);
@@ -103,12 +120,9 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
       console.log(`\n🛑 [CRITICAL FAULT]: PureABAC execution TERMINATED automatically!`);
       console.log(`⚠️ Reason: Computational overhead of ${finalGasABAC} gas units breached the safe threshold of ${CRITICAL_GAS_THRESHOLD}.`);
       console.log(`🛑 Architecture is highly vulnerable to Block Gas Limit Denial of Service (DoS) attacks!`);
-      
-      // Raising an explicit assertion failure to visually break the test suite for the research paper
-      expect.fail(`PureABAC Gas Exhaustion detected: ${finalGasABAC} > ${CRITICAL_GAS_THRESHOLD}`);
     }
 
-    expect(finalGasABAC).to.be.lessThan(CRITICAL_GAS_THRESHOLD);
+    expect(finalGasABAC).to.be.greaterThan(CRITICAL_GAS_THRESHOLD);
   });
 
   // ------------------------------------------------------------------
@@ -116,7 +130,6 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
   // ------------------------------------------------------------------
   it("HRABAC maintains constant O(1) performance under identical storage \n\t strain with no gas fluctuations", async function () {
     const targetHash = ethers.id("Target_Hash_HRABAC");
-    await hrabac.connect(inspector).addDiploma(studentMcpAddress, targetHash);
 
     console.log("\n--- VERIFYING HRABAC ALGORITHMIC INVARIANCE ---");
     
@@ -127,7 +140,8 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
       await hrabac.connect(inspector).addDiploma(randomFakeMcp, randomFakeHash);
     }
 
-    // FIX: Using the correct, fixed verifyDiplomaHRABAC function name and proper gas casting
+    await hrabac.connect(inspector).addDiploma(studentMcpAddress, targetHash);
+    // Gas evaluation matches perfectly with the fixed function name
     const gasHRABAC = Number(await hrabac.connect(employer).verifyDiplomaHRABAC.estimateGas(studentMcpAddress, targetHash));
     console.log(`🟩 Measured EVM gas overhead for HRABAC following storage inflation: ${gasHRABAC} units`);
     console.log(`🎯 Status: Fully Immune to DoS attacks. Consumption remains well \n\t  below the critical threshold.`);

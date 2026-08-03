@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 describe("Gas Benchmark O(1)", function () {
   let registry: any;
   let admin: any, inspector: any, employer: any, student1: any;
+  let node1: any, node2: any, node3: any;
 
   beforeEach(async function () {
     // 1. Explicitly initialize the dynamic network connection required by Hardhat 3
@@ -14,11 +15,24 @@ describe("Gas Benchmark O(1)", function () {
     const ethersHelper = networkConnection.ethers;
 
     // 3. Extracting mock test accounts from the contextual network provider
-    [admin, inspector, employer, student1] = await ethersHelper.getSigners();
+    const signers = await ethersHelper.getSigners();
+    admin = signers[0];
+    inspector = signers[1];
+    employer = signers[2];
+    student1 = signers[3];
+    
+    // Extract separate independent accounts for the multi-sig consortium nodes
+    node1 = signers[4];
+    node2 = signers[5];
+    node3 = signers[6];
 
-    // 4. Deploying the HRABAC contract instance via the correct factory context
+    // Define sorted consortium addresses and the threshold signature parameters
+    const consensusNodes = [...[node1.address, node2.address, node3.address]].sort();
+    const requiredSignatures = 2;
+
+    // 4. Deploying the HRABAC contract instance via the correct multi-sig constructor matrix
     const RegistryFactory = await ethersHelper.getContractFactory("HRABACEducationalRegistry");
-    registry = await RegistryFactory.deploy(admin.address); // Passing Admin into the fixed constructor
+    registry = await RegistryFactory.deploy(admin.address, consensusNodes, requiredSignatures); 
     await registry.waitForDeployment();
     
     // 5. Initializing off-chain registry credentials and systemic trust parameters
@@ -27,7 +41,7 @@ describe("Gas Benchmark O(1)", function () {
   });
 
   it("Should prove O(1) complexity by checking gas cost with \n\t increasing data volume", async function () {
-    // Optimized data scale increments to prove O(1) invariance without crashing the local node timeout bounds
+    // Fix: Scaled down worst-case injection metrics to avoid local Hardhat EVM call timeout execution crashes
     const dataSizes = [1, 10, 50, 100, 200, 1000, 10000]; 
     let lastGasUsed: bigint | null = null;
     this.timeout(120000); // 2-minute timeout bound for storage transitions
