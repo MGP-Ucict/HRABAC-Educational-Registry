@@ -18,7 +18,7 @@ contract HRABACEducationalRegistry {
     error ZeroAddressDetected();
     error UserDoesNotExist();
     error AdminCannotSelfDeactivate();
-    error InvalidMCPToken();
+    error InvalidMPCToken();
     error DiplomaAlreadyRegistered();
     error InvalidAdministrativeAssignment();
     error DuplicateSignatureDetected();
@@ -35,7 +35,7 @@ contract HRABACEducationalRegistry {
     // Slot 0: Maps operator addresses to their structural roles and states
     mapping(address => UserProfile) public users;
     
-    // Slot 1: Maps a specific diploma asset hash to a student's dynamic identity token (mcpAddress)
+    // Slot 1: Maps a specific diploma asset hash to a student's dynamic identity token (mpcAddress)
     mapping(bytes32 => bytes32) private diplomaToOwner;
     
     // Slot 2: Tracks the state root emission index history for Point-In-Time recovery
@@ -53,7 +53,7 @@ contract HRABACEducationalRegistry {
 
     event RoleStatusChanged(uint256 indexed id, string roleType, bool isActive, uint256 timestamp);
     event UserRegistered(address indexed userAddress, uint256 indexed id, Role role);
-    event DiplomaAdded(bytes32 indexed mcpAddress, bytes32 indexed diplomaHash, uint256 timestamp);
+    event DiplomaAdded(bytes32 indexed mpcAddress, bytes32 indexed diplomaHash, uint256 timestamp);
     event NationalStateUpdated(uint256 indexed epochNonce, bytes32 indexed globalStateRoot);
     event ConsensusNodeStatusChanged(address indexed node, bool status);
 
@@ -170,17 +170,17 @@ contract HRABACEducationalRegistry {
      * @notice Maps the resource diploma hash to the student profile token.
      * @dev Automatically updates the secondary extraction matrix to track student asset arrays.
      */
-    function addDiploma(bytes32 _mcpAddress, bytes32 _diplomaHash) external onlyActiveRole(Role.Inspector) {
-        if (_mcpAddress == bytes32(0)) revert InvalidMCPToken();
+    function addDiploma(bytes32 _mpcAddress, bytes32 _diplomaHash) external onlyActiveRole(Role.Inspector) {
+        if (_mpcAddress == bytes32(0)) revert InvalidMPCToken();
         if (diplomaToOwner[_diplomaHash] != bytes32(0)) revert DiplomaAlreadyRegistered();
 
         // Enforce the core historical link mapping the student profile boundary inside Slot 1
-        diplomaToOwner[_diplomaHash] = _mcpAddress;
+        diplomaToOwner[_diplomaHash] = _mpcAddress;
 
         // Populate the student profile credential repository inside Slot 4
-        studentToDiplomas[_mcpAddress].push(_diplomaHash);
+        studentToDiplomas[_mpcAddress].push(_diplomaHash);
 
-        emit DiplomaAdded(_mcpAddress, _diplomaHash, block.timestamp);
+        emit DiplomaAdded(_mpcAddress, _diplomaHash, block.timestamp);
     }
 
     // --- SECTION 3.7: AUTHOR'S STATE BATCHING EXTENDED WITH TRUE M-OF-N MULTI-SIG ---
@@ -245,7 +245,7 @@ contract HRABACEducationalRegistry {
      * @dev Protected via the static Role.Employer modifier. Fixed the compilation bug by placing internal Yul methods correctly.
      */
     function verifyDiplomaHRABAC(
-        bytes32 _mcpAddress,
+        bytes32 _mpcAddress,
         bytes32 _calculatedHash
     ) external view onlyActiveRole(Role.Employer) returns (bool) {
         assembly {
@@ -260,12 +260,12 @@ contract HRABACEducationalRegistry {
             mstore(0x20, 1)
             let slot := keccak256(0x00, 0x40)
             
-            let registeredMCP := sload(slot)
+            let registeredMPC := sload(slot)
             
             // Boolean extraction validation path
             let accessGranted := and(
-                iszero(iszero(registeredMCP)),
-                mjs_is_identical(registeredMCP, _mcpAddress)
+                iszero(iszero(registeredMPC)),
+                mjs_is_identical(registeredMPC, _mpcAddress)
             )
             
             mstore(0x00, accessGranted)
@@ -276,12 +276,12 @@ contract HRABACEducationalRegistry {
     /**
      * @notice Allows a role-free student profile to extract the complete list of their registered diploma hashes.
      * @dev This view function enables the student frontend to query all their personal digital assets.
-     * @param _mcpAddress The identity attribute token of the student profile (generated off-chain via MPC).
+     * @param _mpcAddress The identity attribute token of the student profile (generated off-chain via MPC).
      * @return bytes32[] Array containing all historical cryptographic asset hashes matching the student profile.
      */
-    function getStudentDiplomas(bytes32 _mcpAddress) external view returns (bytes32[] memory) {
-        if (_mcpAddress == bytes32(0)) revert InvalidMCPToken();
-        return studentToDiplomas[_mcpAddress];
+    function getStudentDiplomas(bytes32 _mpcAddress) external view returns (bytes32[] memory) {
+        if (_mpcAddress == bytes32(0)) revert InvalidMPCToken();
+        return studentToDiplomas[_mpcAddress];
     }
 
     function getStateRoot(uint256 _epochNonce) external view returns (bytes32) {
