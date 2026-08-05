@@ -24,6 +24,7 @@ contract HRABACEducationalRegistry {
     error DuplicateSignatureDetected();
     error InsufficientValidSignatures();
     error InvalidConsensusConfiguration();
+    error DiplomaRecordDoesNotExist();
 
     struct UserProfile {
         uint256 id;        
@@ -56,6 +57,8 @@ contract HRABACEducationalRegistry {
     event DiplomaAdded(bytes32 indexed mpcAddress, bytes32 indexed diplomaHash, uint256 timestamp);
     event NationalStateUpdated(uint256 indexed epochNonce, bytes32 indexed globalStateRoot);
     event ConsensusNodeStatusChanged(address indexed node, bool status);
+    event DiplomaNullified(bytes32 indexed diplomaHash, bytes32 indexed mpcAddress, uint256 timestamp);
+    event StudentHistoryCleared(bytes32 indexed mpcAddress, uint256 timestamp);
 
     // Hyper-optimized access gate using inline assembly to bypass high-level mapping checks
     modifier onlyActiveRole(Role _requiredRole) {
@@ -287,4 +290,26 @@ contract HRABACEducationalRegistry {
     function getStateRoot(uint256 _epochNonce) external view returns (bytes32) {
         return stateHistory[_epochNonce];
     }
+
+    /**
+     * @notice Nullifies the operational link between a credential hash and a subject token to enforce GDPR compliance.
+     * @dev Shifting storage values to bytes32(0) purges the EVM state, releasing space and triggering an automatic Gas Refund.
+     * @param _diplomaHash The unique cryptographic document hash (HCALC) acting as the storage key in Slot 1.
+     */
+    function nullifyDiploma(bytes32 _diplomaHash) external onlyActiveRole(Role.Inspector) {
+        bytes32 associatedStudent = diplomaToOwner[_diplomaHash];
+        if (associatedStudent == bytes32(0)) revert DiplomaRecordDoesNotExist();
+
+        // 1. Primary Ledger Nullification: Clear the direct mapping boundary inside Slot 1 to yield EVM Gas Refund
+        diplomaToOwner[_diplomaHash] = bytes32(0);
+
+        // 2. Secondary Repository Purge: Delete the credential array associated with the mpcAddress inside Slot 4
+        // Zeroing out an active dynamic array layout drastically frees up persistent network storage overhead
+        delete studentToDiplomas[associatedStudent];
+
+        // Broadcast deterministic execution logs for off-chain decentralized indexing protocols and audits
+        emit DiplomaNullified(_diplomaHash, associatedStudent, block.timestamp);
+        emit StudentHistoryCleared(associatedStudent, block.timestamp);
+    }
+
 }
