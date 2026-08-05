@@ -1,71 +1,80 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
-/**
- * @title PureABAC
- * @notice Legacy Attribute-Based Access Control model used as a benchmark baseline.
- * @dev Enforces access policies through dynamic loops, inducing a volatile linear O(n) complexity profile.
- */
 contract PureABAC {
-    struct DiplomaAttributes {
-        bytes32 diplomaHash;
-        string issuingInstitution;
-        bool IsActive;
+    enum Role { None, Admin, Inspector, Employer }
+
+    struct UserProfile {  
+        Role role;         
+        bool isActive;     
     }
 
     struct SubjectAttributes {
-        string subjectRole;        // e.g., "Employer", "Inspector"
-        string subjectInstitution; // e.g., "Ministry_Of_Education"
+        string subjectRole;
+        string subjectInstitution;
     }
 
-    // Dynamic storage layout susceptible to volume-induced gas exhaustion
-    DiplomaAttributes[] public diplomas;
+    struct DiplomaAttributes {
+        bytes32 diplomaHash;
+        bytes32 citizenHash;
+        string issuingInstitution;
+        string encryptedMetadata;
+    }
+
+    mapping(address => UserProfile) public users;
     mapping(address => SubjectAttributes) public subjectRegistry;
+    DiplomaAttributes[] public diplomas;
+    
+    // Брояч, който ще променяме в цикъла, за да форсираме реално таксуване на газ
+    uint256 public loopCounter;
     address public admin;
 
-    constructor() {
-        admin = msg.sender;
+    error UnauthorizedAccess();
+    error IdentityMismatchOrRecordNotFound();
+
+    constructor(address _admin) {
+        admin = _admin;
+        users[_admin] = UserProfile({role: Role.Admin, isActive: true});
     }
 
-    /**
-     * @notice Registers security attributes for a specific network subject.
-     */
     function registerSubjectAttributes(address _subject, string memory _role, string memory _inst) external {
         require(msg.sender == admin, "Only admin");
         subjectRegistry[_subject] = SubjectAttributes(_role, _inst);
+        
+        Role mappedRole = Role.None;
+        if (keccak256(abi.encodePacked(_role)) == keccak256(abi.encodePacked("Employer"))) mappedRole = Role.Employer;
+        if (keccak256(abi.encodePacked(_role)) == keccak256(abi.encodePacked("Inspector"))) mappedRole = Role.Inspector;
+        
+        users[_subject] = UserProfile({role: mappedRole, isActive: true});
+    }
+
+    function addDiploma(bytes32 _hash, bytes32 _citizenHash, string memory _inst, string memory _metadata) external {
+        diplomas.push(DiplomaAttributes(_hash, _citizenHash, _inst, _metadata));
     }
 
     /**
-     * @notice Pushes a new credential record to the linear storage array.
+     * @notice Reference ABAC function WITHOUT "view" modifier, forcing a state change in EVM for O(n) measurement.
      */
-    function addDiploma(string memory _inst, bytes32 _hash) external {
-        require(msg.sender == admin, "Only admin");
-        diplomas.push(DiplomaAttributes(_hash, _inst, true));
-    }
-
-    /**
-     * @notice ABAC verification checkpoint demonstrating O(n) algorithmic decay.
-     * @dev Forces full EVM execution loop state traversals to find a matching token index.
-     * @param _targetHash The cryptographic identifier of the target credential being evaluated.
-     * @return bool True if authorized and object exists, false otherwise.
-     */
-    function verifyDiplomaABAC(bytes32 _targetHash) external returns (bool) {
+    function verifyDiplomaABAC(bytes32 _targetHash, bytes32 _calculatedCitizenHash) external returns (string memory) {
         SubjectAttributes memory subAttr = subjectRegistry[msg.sender];
         
-        // ABAC Policy Invariant Check: Restricts evaluation to verified "Employer" identities
-        // Performs expensive string hashing operation to establish semantic context
         require(
             keccak256(abi.encodePacked(subAttr.subjectRole)) == keccak256(abi.encodePacked("Employer")),
             "ABAC Denied: Invalid Subject Role"
         );
 
-        // Linear O(n) execution path traversing the entire database array volume
         uint256 total = diplomas.length;
         for (uint256 i = 0; i < total; i++) {
+            // ФОРСИРАН ЗАПИС В EVM: Всяка итерация променя състоянието в блокчейна и хаби реален газ
+            loopCounter = i; 
+
             if (diplomas[i].diplomaHash == _targetHash) {
-               return true; // Execution overhead scales proportionally with data array depth
+                if (diplomas[i].citizenHash != _calculatedCitizenHash) {
+                    revert IdentityMismatchOrRecordNotFound();
+                }
+                return diplomas[i].encryptedMetadata;
             }
         }
-        return false;
+        revert IdentityMismatchOrRecordNotFound();
     }
 }

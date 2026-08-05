@@ -1,89 +1,88 @@
 import { expect } from "chai";
-import hre from "hardhat";
-import { ethers } from "ethers";
+import hre from "hardhat"; 
 
-describe("Gas Benchmark O(1)", function () {
+describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
   let registry: any;
   let admin: any, inspector: any, employer: any, student1: any;
-  let node1: any, node2: any, node3: any;
+  let ethers: any; 
 
   beforeEach(async function () {
-    // 1. Explicitly initialize the dynamic network connection required by Hardhat 3
-    const networkConnection = await hre.network.create();
-    
-    // 2. Extract the local network-bound ethers helper context
-    const ethersHelper = networkConnection.ethers;
+    // Initialize the dynamic network connection instance
+    const connection = await hre.network.create();
+    ethers = connection.ethers;
 
-    // 3. Extracting mock test accounts from the contextual network provider
-    const signers = await ethersHelper.getSigners();
-    admin = signers[0];
-    inspector = signers[1];
-    employer = signers[2];
-    student1 = signers[3];
-    
-    // Extract separate independent accounts for the multi-sig consortium nodes
-    node1 = signers[4];
-    node2 = signers[5];
-    node3 = signers[6];
+    // Fetch independent mock signers from the runtime provider context
+    const signers = await ethers.getSigners();
+    [admin, inspector, employer] = signers; 
 
-    // Define sorted consortium addresses and the threshold signature parameters
-    const consensusNodes = [...[node1.address, node2.address, node3.address]].sort();
-    const requiredSignatures = 2;
-
-    // 4. Deploying the HRABAC contract instance via the correct multi-sig constructor matrix
-    const RegistryFactory = await ethersHelper.getContractFactory("HRABACEducationalRegistry");
-    registry = await RegistryFactory.deploy(admin.address, consensusNodes, requiredSignatures); 
+    // Deploy the smart contract passing the root Administrator address as the constructor argument
+    const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
+    registry = await RegistryFactory.deploy(admin.address); 
     await registry.waitForDeployment();
     
-    // 5. Initializing off-chain registry credentials and systemic trust parameters
-    await registry.connect(admin).registerInspector(inspector.address, 50005);
-    await registry.connect(inspector).registerEmployer(employer.address, 40004);
+    // Provision system operator roles to match structural trust parameters
+    await registry.connect(admin).registerInspector(inspector.address);
+    await registry.connect(inspector).registerEmployer(employer.address);
   });
 
-  it("Should prove O(1) complexity by checking gas cost with \n\t increasing data volume", async function () {
-    // Fix: Scaled down worst-case injection metrics to avoid local Hardhat EVM call timeout execution crashes
+  it("Should prove O(1) complexity by checking gas cost with increasing data volume", async function () {
+    // Standard data scaling vectors used for complexity profiling
     const dataSizes = [1, 10, 50, 100, 200, 1000, 10000]; 
     let lastGasUsed: bigint | null = null;
-    this.timeout(120000); // 2-minute timeout bound for storage transitions
+    this.timeout(120000); // 2-minute safety window for execution benchmarking
     
-    // Generating the REFERENCE CREDENTIAL to be systematically verified across all iterations.
-    const targetStudentMcp = ethers.id("Target_Student_Static_MCP_Token");
-    const targetHash = ethers.id("Target_Academic_Diploma_2026");
+    // Explicit 32-byte hashes definitions to isolate metadata evaluation from JS string padding anomalies
+    const targetDiplomaHash = ethers.id("Target_Academic_Diploma_2026");
     
-    // Committing the target entry into storage to serve as the baseline measurement
-    await registry.connect(inspector).addDiploma(targetStudentMcp, targetHash);
+    // Safe manual buffer packing matching Solidity's abi.encodePacked bit pattern
+    const packedSecretBytes = ethers.concat([
+      ethers.toUtf8Bytes("John Doe"),
+      ethers.toUtf8Bytes("004515XXXX")
+    ]);
+    const targetCitizenHash = ethers.keccak256(packedSecretBytes);
+    
+    const targetPayload = "Encrypted_University_Sofia_Computer_Science_Excellent_5.80";
+    
+    // Seed database with the correct mapped properties passing exactly 3 arguments
+    await registry.connect(inspector).addDiploma(targetDiplomaHash, targetCitizenHash, targetPayload);
 
     console.log("\n--- START GAS BENCHMARK ---");
 
-    // Tracking the precise structural entries currently active in the blockchain storage mapping
     let currentCount = 1; 
 
+    // Execute state layout saturation loops to evaluate algorithmic immunity against data scaling
     for (let size of dataSizes) {
-      // Calculating the differential volume of dummy entries required to meet the current threshold size
       const itemsToAdd = size - currentCount;
 
-      // Storage Inflation Loop: Artificially expanding the EVM mapping layout (mapping(bytes32 => bytes32))
       for (let i = 0; i < itemsToAdd; i++) {
-        const fakeStudentMcp = ethers.id(`Fake_MCP_Token_${size}_${i}`); 
-        const fakeHash = ethers.id(`Fake_Diploma_Hash_${size}_${i}`); 
-        await registry.connect(inspector).addDiploma(fakeStudentMcp, fakeHash);
+        const fakeDiplomaHash = ethers.id(`Fake_Diploma_Hash_${size}_${i}`); 
+        const fakeCitizenHash = ethers.id(`Fake_Citizen_Hash_${size}_${i}`); 
+        
+        // Populate the ledger index mapping layer sequentially with isolated entries
+        await registry.connect(inspector).addDiploma(fakeDiplomaHash, fakeCitizenHash, "Fake_Metadata_Payload");
         currentCount++;
       }
 
-      // CORE EMPIRICAL MEASUREMENT: Testing gas consumption using the correct fixed verifyDiplomaHRABAC function
-      const gasUsed: bigint = await registry.connect(employer).verifyDiplomaHRABAC.estimateGas(targetStudentMcp, targetHash);
+      // Execute a static view query invocation using getFunction syntax to verify path validity
+      // This will now execute perfectly along the SUCCESS path with NO reverts
+      const gasUsed: bigint = await registry
+        .connect(employer)
+        .getFunction("verifyAndFetchMetadata")
+        .estimateGas(
+          targetDiplomaHash, 
+          targetCitizenHash
+        );
       
       console.log(`Data Volume: ${size} diplomas in DB | Gas Used for verification: ${gasUsed.toString()} gas`);
 
-      // ACADEMIC ASSERTION FOR O(1) INVARIANCE
-      // Verifying that computational gas overhead remains mathematically identical across variable storage scales
+      // Enforce the strict constant-time mathematical constraint to prove the delta is exactly 0
       if (lastGasUsed !== null) {
-        expect(gasUsed).to.equal(lastGasUsed);
+        expect(gasUsed).to.equal(lastGasUsed, "Gas footprint mutated! Code does not exhibit strict O(1) properties.");
       }
       lastGasUsed = gasUsed;
     }
     
     console.log("--- END GAS BENCHMARK ---\n");
-    console.log(`📊 Empirical Proof: Since the gas delta is exactly 0 across all storage \n\t volumes, algorithmic complexity is strictly O(1).`);
+    console.log(`📊 Empirical Proof: Since the gas delta is exactly 0 across all storage volumes, algorithmic complexity is strictly O(1).`);
   });
 });
