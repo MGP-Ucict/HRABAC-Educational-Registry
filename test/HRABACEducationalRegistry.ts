@@ -34,9 +34,7 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
 
     // Pre-calculate baseline target parameters inside the setup layout layer
     targetDiplomaHash = ethersCtx.id("Target_Academic_Diploma_2026");
-    
-    // ПОПРАВКА НА АРГУМЕНТИТЕ: Премахваме масива от типове, който чупеше логиката в Ethers v6.
-    // Използваме ethers.solidityPackedKeccak256 с точна структура (типове, стойности) за пресъздаване на abi.encodePacked.
+  
     targetCitizenHash = ethersCtx.solidityPackedKeccak256(
       ["string", "string"], 
       [targetCitizenName, targetNationalID]
@@ -72,56 +70,57 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
       // Setup structural trust parameters using pure signer wallets
       await registry.connect(inspector).registerEmployer(employer.address);
       
-      // ПОПРАВКА: Подават се 3-те задължителни аргумента към addDiploma
-      await registry.connect(inspector).addDiploma(targetDiplomaHash, targetCitizenHash, targetEncryptedPayload);
+     // Safe manual buffer packing matching Solidity's abi.encodePacked bit pattern
+    const packedSecretBytes = ethersCtx.concat([
+      ethersCtx.toUtf8Bytes("John Doe"),
+      ethersCtx.toUtf8Bytes("004515XXXX")
+    ]);
+    const targetCitizenHash = ethersCtx.keccak256(packedSecretBytes);
+    
+    const targetPayload = "Encrypted_University_Sofia_Computer_Science_Excellent_5.80"; 
+    
+    // Seed database with the correct mapped properties passing exactly 3 arguments
+    await registry.connect(inspector).addDiploma(targetDiplomaHash, targetCitizenHash, targetPayload);
+
     });
 
     it("Should allow Employer to successfully verify a valid diploma link and pull cipher logs", async function () {
       const startTime = performance.now();
       
-      // ETHERS V6 FIXED RULE: Call view verification methods directly without using the obsolete .staticCall property
-      const returnedPayload = await registry.connect(employer).verifyAndFetchMetadata(
+     const returnedPayload = await registry.connect(employer).verifyAndFetchMetadata(
         targetDiplomaHash,
-        targetCitizenName,
-        targetNationalID
+        targetCitizenHash
       );
       
       const endTime = performance.now();
       console.log(`\x1b[36m[BENCHMARK] verifyAndFetchMetadata Execution Time: ${(endTime - startTime).toFixed(4)} ms\x1b[0m`);
-      
       expect(returnedPayload).to.equal(targetEncryptedPayload);
     });
 
     it("Should prove O(1) read complexity by checking gas cost with increasing data volume", async function () {
-      // 1. Измерваме газовия разход за валидация при 1 наличен запис в базата чрез .estimateGas
-      const gasWithOneRecord = await registry.connect(employer).verifyAndFetchMetadata.estimateGas(
+      const gasWithOneRecord: bigint = await registry.connect(employer).verifyAndFetchMetadata.estimateGas(
         targetDiplomaHash,
-        targetCitizenName,
-        targetNationalID
+        targetCitizenHash
       );
 
-      // 2. Симулираме разрастване на мапинга (пълнене на базата с чужди изолирани записи)
       const dataVolume = 10; 
       for (let i = 0; i < dataVolume; i++) {
-        const dummyDiploma = ethersCtx.id(`Dummy_Diploma_${i}`);
-        const dummyCitizen = ethersCtx.id(`Dummy_Citizen_${i}`);
-        // ПОПРАВКА: Предават се коректно 3-те аргумента в цикъла за dummy инжектиране
-        await registry.connect(inspector).addDiploma(dummyDiploma, dummyCitizen, "Dummy_Metadata_Payload");
+        const fakeDiplomaHash = ethersCtx.id(`Fake_Diploma_Hash_${dataVolume}_${i}`); 
+        const fakeCitizenHash = ethersCtx.id(`Fake_Citizen_Hash_${dataVolume}_${i}`); 
+        
+        // Populate the ledger index mapping layer sequentially with isolated entries
+        await registry.connect(inspector).addDiploma(fakeDiplomaHash, fakeCitizenHash, "Fake_Metadata_Payload");
       }
 
-      // 3. Измерваме новия газов разход за първоначалния целеви запис в натоварената база
       const gasWithManyRecords = await registry.connect(employer).verifyAndFetchMetadata.estimateGas(
         targetDiplomaHash,
-        targetCitizenName,
-        targetNationalID
+        targetCitizenHash
       );
 
-      console.log(`\x1b[32m[GAS REPORT] Базов газ при 1 запис: ${gasWithOneRecord.toString()} | Газ при ${dataVolume + 1} записа: ${gasWithManyRecords.toString()}\x1b[0m`);
+      console.log(`\x1b[32m[GAS REPORT] 1 Record: ${gasWithOneRecord.toString()} | ${dataVolume} Records: ${gasWithManyRecords.toString()}\x1b[0m`);
 
-      // МАТЕМАТИЧЕСКО НАУЧНО ДОКАЗАТЕЛСТВО ЗА O(1):
-      // Тъй като мапингът използва Yul/EVM нискослойни storage slots lookups, разликата в газа трябва да бъде ТОЧНО 0 единици.
       expect(gasWithManyRecords).to.equal(gasWithOneRecord, "Gas variance detected! Not O(1) constant-time complexity.");
-      expect(gasWithManyRecords).to.equal(36695n, "Gas footprint does not match the strict academic framework ceiling.");
+      expect(gasWithManyRecords).to.equal(37187n, "Gas footprint does not match the strict academic framework ceiling.");
     });
 
     it("Should return false or revert if an Employer evaluates a deactivated student profile", async function () {
@@ -132,8 +131,7 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
       try {
         await registry.connect(employer).verifyAndFetchMetadata(
           targetDiplomaHash,
-          targetCitizenName,
-          targetNationalID
+          targetCitizenHash
         );
         expect.fail("Transaction should have reverted due to deactivation");
       } catch (error: any) {
@@ -142,12 +140,12 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
     });
 
     it("Should revert if an Employer evaluates a mismatched identity string relationship", async function () {
+      const fakeCitizenHash = ethersCtx.id(`Fake_Citizen_Hash`); 
       try {
         // Trigger structural verification under invalid name vectors to force an identity mismatch revert
         await registry.connect(employer).verifyAndFetchMetadata(
           targetDiplomaHash,
-          "Malicious Name",
-          "9999999999"
+          fakeCitizenHash
         );
         expect.fail("Transaction should have reverted due to identity mismatch");
       } catch (error: any) {
@@ -166,7 +164,6 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
       const localPayload = "Test_Payload";
 
       try {
-        // ПОПРАВКА: Подават се коректно 3-те аргумента към addDiploma при отхвърлянето на администратора
         await registry.connect(admin).addDiploma(localDiplomaHash, localCitizenHash, localPayload);
         expect.fail("Transaction should have reverted but it succeeded");
       } catch (error: any) {

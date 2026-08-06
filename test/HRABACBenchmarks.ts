@@ -83,6 +83,6 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
     }
     
     console.log("--- END GAS BENCHMARK ---\n");
-    console.log(`📊 Empirical Proof: Since the gas delta is exactly 0 across all storage volumes, algorithmic complexity is strictly O(1).`);
+    console.log(`📊 Empirical Proof: Since the gas delta is exactly 0 across all storage volumes,\n algorithmic complexity is strictly O(1).`);
   });
 });

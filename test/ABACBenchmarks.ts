@@ -86,6 +86,6 @@ describe("Gas Benchmark ABAC - Reference Legacy Linear O(n) Proof", function () 
     }
     
     console.log("--- END LEGACY ABAC GAS BENCHMARK ---\n");
-    console.log("📊 Empirical Conclusion: Verified linear O(n) degradation. Loop state transitions scale gas proportional to array depth.");
+    console.log("📊 Empirical Conclusion: Verified linear O(n) degradation.\n Loop state transitions scale gas proportional to array depth.");
   });
 });

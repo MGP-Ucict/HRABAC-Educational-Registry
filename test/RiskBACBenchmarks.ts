@@ -11,7 +11,7 @@ describe("Gas Benchmark RiskBAC", function () {
     ethers = connection.ethers;
 
     const signers = await ethers.getSigners();
-    [admin, inspector, employer] = signers; 
+    [inspector, employer] = signers; 
 
     const AdaptedRiskBACFactory = await ethers.getContractFactory("AdaptedRiskBAC");
     riskRegistry = await AdaptedRiskBACFactory.deploy(inspector.address); 
@@ -73,6 +73,6 @@ describe("Gas Benchmark RiskBAC", function () {
     }
     
     console.log("--- END RISK-BAC GAS BENCHMARK ---\n");
-    console.log(`📊 Empirical Conclusion: While Risk-BAC retains O(1) storage lookup via mappings, it introduces significant computational gas overhead during dynamic risk calculations.`);
+    console.log(`📊 Empirical Conclusion: While Risk-BAC retains O(1) storage lookup via mappings,\n it introduces significant computational gas overhead during dynamic risk calculations.`);
   });
 });
