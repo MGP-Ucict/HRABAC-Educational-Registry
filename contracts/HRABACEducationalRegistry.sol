@@ -42,7 +42,7 @@ contract HRABACEducationalRegistry {
 
     event UserRegistered(address indexed userAddress, Role role);
     event RoleStatusChanged(address indexed userAddress, string roleType, bool isActive, uint256 timestamp);
-    event StudentStatusChanged(bytes32 indexed mpcAddress, bool isDeactivated, uint256 timestamp);
+    event StudentStatusChanged(bytes32 indexed citizenHash, bool isDeactivated, uint256 timestamp);
     event DiplomaAdded(bytes32 indexed diplomaHash, bytes32 indexed citizenHash, uint256 timestamp);
 
     // High-performance clean Solidity modifier validating caller blockchain address attributes
@@ -108,13 +108,13 @@ contract HRABACEducationalRegistry {
 
     /**
      * @notice Soft-locks or un-locks a role-free citizen node identity to support dynamic privacy requirements.
-     * @param _mpcAddress The deterministic unique 32-byte cryptographic token hash of the citizen.
+     * @param _citizenHash The deterministic unique 32-byte cryptographic token hash of the citizen.
      * @param _deactivate True to lock out data verification; False to re-enable it.
      */
-    function setStudentDeactivatedStatus(bytes32 _mpcAddress, bool _deactivate) external onlyActiveRole(Role.Admin) {
-        if (_mpcAddress == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
-        studentDeactivated[_mpcAddress] = _deactivate;
-        emit StudentStatusChanged(_mpcAddress, _deactivate, block.timestamp);
+    function setStudentDeactivatedStatus(bytes32 _citizenHash, bool _deactivate) external onlyActiveRole(Role.Admin) {
+        if (_citizenHash == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
+        studentDeactivated[_citizenHash] = _deactivate;
+        emit StudentStatusChanged(_citizenHash, _deactivate, block.timestamp);
     }
 
     // --- Business / Academic Core ---
@@ -156,7 +156,7 @@ contract HRABACEducationalRegistry {
 
     // --- Clean View Verification Layer ---
 
-          /**
+    /**
      * @notice High-performance zero-overhead validation engine in pure Solidity.
      * @dev Achieves absolute O(1) complexity and immunity against gas explosion.
      * @param _diplomaHash The unique cryptographic document identifier.
@@ -184,6 +184,7 @@ contract HRABACEducationalRegistry {
             revert IdentityMismatchOrRecordNotFound();
         }
 
+        // Enforce RBAC validation gate for the caller profile attributes
         UserProfile memory callerProfile = users[msg.sender];
         if (!callerProfile.isActive || (
             callerProfile.role != Role.Admin && 
@@ -195,6 +196,4 @@ contract HRABACEducationalRegistry {
 
         return record.encryptedMetadata;
     }
-
 }
-            
