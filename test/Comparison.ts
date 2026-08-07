@@ -17,13 +17,13 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     [admin, inspector, employer, student] = signers;
 
     // 1. DEPLOY CONTRACTS
-    // In PureRiskBAC, the deployer wallet (admin) automatically becomes the default contract inspector
     const PureRiskBACFactory = await ethers.getContractFactory("AdaptedRiskBAC");
     riskBac = await PureRiskBACFactory.deploy(inspector.address);
 
     const PureABACFactory = await ethers.getContractFactory("PureABAC");
     abac = await PureABACFactory.deploy(admin.address);
 
+    // FIX: Target the updated architectural contract name
     const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
     hrabac = await RegistryFactory.deploy(admin.address); 
       
@@ -45,25 +45,20 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     const targetCitizenHash = ethers.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
     const targetPayload = "Encrypted_University_Sofia_Computer_Science_Excellent_5.80";
     
-    // The contract deployer (admin) seeds the record inside PureRiskBAC matching the 4-argument signature tier
     await riskBac.connect(inspector).addDiploma(targetDiplomaHash, targetCitizenHash, 30, targetPayload);
     await riskBac.connect(inspector).registerEmployer(employer.address);
     
     console.log("\n--- SIMULATING LOGICAL LOCKOUT IN RISKBAC ---");
 
-    const wrongCitizenHash = ethers.ZeroHash;
-    let deadlockCaptured = false;
-
     try {
       for (let i = 1; i <= 6; i++) {
-        // FIXED: Invoked via ADMIN to satisfy require(msg.sender == inspector) constraint inside PureRiskBAC
         const tx = await riskBac.connect(inspector).simulateFailedAttempt(employer.address);
         await tx.wait();
         console.log(`❌ Failed access attempt #${i} committed to the blockchain state telemetry.`);
       }
     } catch (error: any) {
       if (error.message.includes("AccessBlockedDueToRiskDeadlock") || error.message.includes("revert")) {
-        deadlockCaptured = true;
+        // Expected behavior caught
       } else {
         throw error;
       }
@@ -75,7 +70,7 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     try {
       accessResult = await riskBac.connect(employer).verifyDiplomaRiskBAC.staticCall(targetDiplomaHash, targetCitizenHash);
     } catch (e) {
-      accessResult = false; // Capture the runtime evaluation lock execution block
+      accessResult = false; 
     }
     console.log(`🚨 Verification outcome for the legitimate credential: ${accessResult ? "OPERATIONAL" : "LOCKED OUT (Logical Crash)"}`);
     
@@ -96,7 +91,6 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
       const fakeDiplomaHash = ethers.id(`Fake_Diploma_Hash_${i}`);
       const fakeCitizenHash = ethers.id(`Fake_Citizen_Hash_${i}`);
       
-      // Seed legacy storage records directly using the primary system admin wallet
       await abac.connect(admin).addDiploma(
         fakeDiplomaHash, 
         fakeCitizenHash, 
@@ -105,7 +99,6 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
       );
     }
 
-    // Anchor the target verification record at the very bottom index slot via Admin
     await abac.connect(admin).addDiploma(
       targetDiplomaHash, 
       targetCitizenHash, 
@@ -113,7 +106,6 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
       "Encrypted_Target_Payload"
     ); 
     
-    // Measure dynamic gas consumption using type-safe estimation properties
     const finalGasABAC = Number(
       await abac.connect(employer).verifyDiplomaABAC.estimateGas(targetDiplomaHash, targetCitizenHash)
     );
@@ -137,17 +129,37 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
 
     console.log("\n--- VERIFYING HRABAC ALGORITHMIC INVARIANCE ---");
     
-    // Injecting identical load factors into the clean append-only index layer via Inspector
-    for (let i = 0; i < 150; i++) {
-      const randomFakeMcp = ethers.id(`Fake_MCP_Identity_${i}`);
-      const randomFakeHash = ethers.id(`Fake_HR_Diploma_${i}`);
-      await hrabac.connect(inspector).addDiploma(randomFakeMcp, randomFakeHash, "Fake_Encrypted_Payload");
+    const recordsToInject = 150;
+    const fakeEpochRoot = ethers.id("Epoch_Root_DoS_Simulation_099");
+    const fakeDiplomaHashes: string[] = [];
+    const fakeCitizenHashes: string[] = [];
+    const fakePayloads: string[] = [];
+
+    // Compile dynamic fake elements for batch ingestion
+    for (let i = 0; i < recordsToInject; i++) {
+      fakeDiplomaHashes.push(ethers.id(`Fake_HR_Diploma_${i}`));
+      fakeCitizenHashes.push(ethers.id(`Fake_MCP_Identity_${i}`));
+      fakePayloads.push("Fake_Encrypted_Payload");
     }
 
-    // Seed database with the legitimate target tracking variables matching the 4-argument layout tier
-    await hrabac.connect(inspector).addDiploma(targetDiplomaHash, targetCitizenHash, targetPayload);
+    // FIX: Inject structural load factors as an optimized atomic Epoch State Emission
+    await hrabac.connect(inspector).emitEpochState(
+      fakeEpochRoot,
+      fakeDiplomaHashes,
+      fakeCitizenHashes,
+      fakePayloads
+    );
+
+    // Commit the legitimate verification record in its own epoch block
+    const legitimateEpochRoot = ethers.id("Epoch_Root_Legitimate_100");
+    await hrabac.connect(inspector).emitEpochState(
+      legitimateEpochRoot,
+      [targetDiplomaHash],
+      [targetCitizenHash],
+      [targetPayload]
+    );
     
-    // Target the exact view method signature verifyAndFetchMetadata using type-safe getFunction syntax
+    // Estimate gas execution profile over the updated view signature method
     const gasHRABAC = Number(
       await hrabac.connect(employer)
         .getFunction("verifyAndFetchMetadata")
@@ -156,6 +168,8 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     console.log(`🟩 Measured EVM gas overhead for HRABAC following storage inflation: ${gasHRABAC} units`);
     console.log(`🎯 Status: Fully Immune to DoS attacks. Consumption remains well below the critical threshold.`);
 
+    // Expect the strict static gas constraint matching the O(1) storage layout allocation path
+    expect(gasHRABAC).to.equal(41539);
     expect(gasHRABAC).to.be.lessThan(CRITICAL_GAS_THRESHOLD);
   });
 });
