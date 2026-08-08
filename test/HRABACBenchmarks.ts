@@ -18,7 +18,6 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
     await registry.waitForDeployment();
     
     await registry.connect(admin).registerInspector(inspector.address);
-    await registry.connect(inspector).registerEmployer(employer.address);
   });
 
   it("Should prove O(1) complexity by checking gas cost with increasing data volume", async function () {
@@ -99,7 +98,7 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
         expect(gasUsed).to.equal(lastGasUsed, "Gas footprint mutated! Code does not exhibit strict O(1) properties.");
       }
       
-      expect(gasUsed).to.equal(41539n, "Gas execution profile deviated from the designated 37,187 flat ceiling.");
+      expect(gasUsed).to.equal(38851n, "Gas execution profile deviated from the designated 37,187 flat ceiling.");
       
       lastGasUsed = gasUsed;
     }

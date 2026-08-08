@@ -29,16 +29,20 @@ Ensure you have [Node.js (v18.x or higher)](https://nodejs.org/) and npm install
 
 Clone this repository and install the development packages:
 
+```shell
 git clone https://github.com/MGP-Ucict/HRABAC-Educational-Registry.git
 cd HRABAC-Educational-Registry
 
 npm install
+```
 
 ## 3. Compile Smart Contracts
 
 Compile the Solidity code using the configured Hardhat compiler:
 
+```shell
 npx hardhat compile
+```
 
 ------------------------------
 ## 📊 Running the Empirical Test & Security Suite
@@ -47,23 +51,29 @@ The test infrastructure is segmented into three standalone simulation targets de
 
 ## 1. Execute proposed HRABAC O(1) Stress-Test
 
-Validates the flat execution baseline of exactly 27,727 gas across database depths expanding exponentially from 1 to 10,000 live storage items.
+Validates the flat execution baseline of exactly 38,851 gas across database depths expanding exponentially from 1 to 10,000 live storage items.
 
+```shell
 npx hardhat test test/HRABACBenchmarks.ts
+```
 
-Expected Outcome: 1 passing (~1.5m) console confirmation showcasing uniform transaction price stability.
+Expected Outcome: 1 passing console confirmation showcasing uniform transaction price stability.
 
 ## 2. Execute RiskBAC Dynamic Tracking Benchmark
 
 Measures the gas profile under variable behavioral and failure history inputs, logging dynamic metric updates.
 
+```shell
 npx hardhat test test/RiskBACBenchmarks.ts
+```
 
 ## 3. Execute Critical Vulnerability & Block Gas Limit DoS Simulation
 
 Injects 350 structural storage metrics to actively crash the PureABAC dynamic execution loops. This script tests the contract past the established micro-threshold boundary ($\tau_{\text{gas}} = 120,000$) to visually trigger software failures, while showing HRABAC immunity under identical strain.
 
+```shell
 npx hardhat test test/Comparison.ts
+```
 
 Expected Outcome: Controlled compilation assertion fault (expect.fail) explicitly proving PureABAC susceptibility to contract bricking.
 
@@ -71,14 +81,16 @@ Expected Outcome: Controlled compilation assertion fault (expect.fail) explicitl
 
 The ABAC benchmarking suite is engineered to document performance breakdowns caused by iterative storage traversals.
 
+```shell
 npx hardhat test test/ABACBenchmarks.ts
+```
 
 1. Worst-Case Setup: The target credential hash is pushed to the absolute end of the dynamic array, forcing the EVM loop to scan every single index to replicate an adversarial worst-case query.
 2. Volume-Induced Price Explosion: Every single iteration triggers expensive SLOAD opcodes. The console logs will outline the explicit linear progression:
-   - 1 Record   | 33,021 gas
-   - 10 Records  | 54,369 gas
-   - 100 Records | 267,849 gas
-   - 1000 Records| 2,402,649 gas
+   - 1 Record    | 45,342 gas
+   - 10 Records  | 87,508 gas
+   - 100 Records | 310,168 gas
+   - 1000 Records| 2,536,756 gas
 3. Block Gas Limit Extrapolation: Projections confirm that scaling to a routine public volume (12,000 to 15,000 records) breaches the 30,000,000 Mainnet Block Gas Limit, triggering execution reverts and permanent contract bricking.
 
 ------------------------------
@@ -86,9 +98,9 @@ npx hardhat test test/ABACBenchmarks.ts
 
 | Access Control Model | Algorithmic Complexity | Baseline Verification Cost | Cost at 1000 Records | Critical Security Risk |
 |---|---|---|---|---|
-| PureABAC | $\mathcal{O}(n)$ | 33,021 gas | 2,402,649 gas| Block Gas Limit DoS / Bricking |
-| PureRiskBAC | $\mathcal{O}(1)$ storage lookups | 38,272 gas | Not Evaluated (N/A) | False-Positive Operational Lockouts |
-| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 27,727 gas | 27,727 gas | None (Fully Immune) |
+| PureABAC | $\mathcal{O}(n)$ | 45,342 gas | 2,536,756 gas| Block Gas Limit DoS / Bricking |
+| PureRiskBAC | $\mathcal{O}(1)$ storage lookups | 44,273 gas | Not Evaluated (N/A) | False-Positive Operational Lockouts |
+| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 38,851 gas | 38,851 gas | None (Fully Immune) |
 
 ------------------------------
 

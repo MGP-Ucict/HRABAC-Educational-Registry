@@ -9,7 +9,7 @@ pragma solidity ^0.8.24;
 contract HRABACEducationalRegistry {
 
     // System operator roles. None (0) serves as an uninitialized marker.
-    enum Role { None, Admin, Inspector, Employer }
+    enum Role { None, Admin, Inspector }
 
     // --- STRUCTS (MUST BE DECLARED BEFORE MAPPINGS) ---
     struct UserProfile {  
@@ -35,7 +35,7 @@ contract HRABACEducationalRegistry {
 
     // --- STORAGE LAYOUT (OPTIMIZED FOR STATIC GAS) ---
     mapping(address => UserProfile) public users;
-    mapping(bytes32 => DiplomaRegistry) private registries; // Now unique and found!
+    mapping(bytes32 => DiplomaRegistry) private registries; 
     mapping(bytes32 => bool) public validatedEpochs;
     mapping(bytes32 => bool) private studentDeactivated;
     bytes32[] public epochHistory;
@@ -90,8 +90,7 @@ contract HRABACEducationalRegistry {
         
         string memory roleLabel;
         Role r = profile.role;
-        if (r == Role.Employer) roleLabel = "Employer";
-        else if (r == Role.Inspector) roleLabel = "Inspector";
+        if (r == Role.Inspector) roleLabel = "Inspector";
         else roleLabel = "Admin";
 
         emit RoleStatusChanged(_userAddress, roleLabel, _status, block.timestamp);
@@ -106,18 +105,6 @@ contract HRABACEducationalRegistry {
         if (_citizenHash == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
         studentDeactivated[_citizenHash] = _deactivate;
         emit StudentStatusChanged(_citizenHash, _deactivate, block.timestamp);
-    }
-
-    // --- Business / Academic Core ---
-
-    /**
-     * @notice Onboards an external Employer entity allowing them to verify records against the registry view layer.
-     * @param _employer The public wallet address of the validated verification entity.
-     */
-    function registerEmployer(address _employer) external onlyActiveRole(Role.Inspector) {
-        if (_employer == address(0)) revert ZeroAddressDetected();
-        users[_employer] = UserProfile({role: Role.Employer, isActive: true});
-        emit UserRegistered(_employer, Role.Employer);
     }
 
     // --- BUSINESS CORE: BATCH EPOCH EMISSION ---
@@ -155,7 +142,7 @@ contract HRABACEducationalRegistry {
         emit EpochValidated(_epochRoot, block.timestamp);
     }
 
-    // --- READ VIEW LAYER: STATIC 37,187 GAS VERIFICATION ENGINE ---
+    // --- READ VIEW LAYER: STATIC 38,895 GAS VERIFICATION ENGINE ---
 
     /**
      * @notice High-performance zero-overhead validation engine executing with absolute O(1) complexity.
@@ -181,15 +168,6 @@ contract HRABACEducationalRegistry {
 
         if (!validatedEpochs[record.epochRoot]) {
             revert IdentityMismatchOrRecordNotFound();
-        }
-
-        UserProfile memory callerProfile = users[msg.sender];
-        if (!callerProfile.isActive || (
-            callerProfile.role != Role.Admin && 
-            callerProfile.role != Role.Inspector && 
-            callerProfile.role != Role.Employer
-        )) {
-            revert UnauthorizedAccess();
         }
 
         return record.encryptedMetadata;

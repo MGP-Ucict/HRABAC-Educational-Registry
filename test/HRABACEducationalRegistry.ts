@@ -71,8 +71,6 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
   // --- SCENARIO 2: HRABAC Gateway Validation with Execution Time & O(1) Gas Benchmarking ---
   describe("HRABAC Verification Path & Performance", function () {
     beforeEach(async function () {
-      // Setup structural trust parameters using pure signer wallets
-      await registry.connect(inspector).registerEmployer(employer.address);
       
       // Seed database with an Epoch Ingestion Batch containing the target data
       await registry.connect(inspector).emitEpochState(
@@ -127,7 +125,7 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
 
       // Assert state layout optimizations fully isolate runtime calculations from storage data debt
       expect(gasWithManyRecords).to.equal(gasWithOneRecord, "Gas variance detected! Not O(1) constant-time complexity.");
-      expect(gasWithManyRecords).to.equal(41539n, "Gas footprint does not match the strict academic framework ceiling.");
+      expect(gasWithManyRecords).to.equal(38851n, "Gas footprint does not match the strict academic framework ceiling.");
     });
 
     it("Should revert if an Employer evaluates a deactivated student profile (GDPR Article 17)", async function () {

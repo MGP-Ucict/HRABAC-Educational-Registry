@@ -25,7 +25,6 @@ contract PureABAC {
     mapping(address => SubjectAttributes) public subjectRegistry;
     DiplomaAttributes[] public diplomas;
     
-    // Брояч, който ще променяме в цикъла, за да форсираме реално таксуване на газ
     uint256 public loopCounter;
     address public admin;
 
@@ -65,7 +64,6 @@ contract PureABAC {
 
         uint256 total = diplomas.length;
         for (uint256 i = 0; i < total; i++) {
-            // ФОРСИРАН ЗАПИС В EVM: Всяка итерация променя състоянието в блокчейна и хаби реален газ
             loopCounter = i; 
 
             if (diplomas[i].diplomaHash == _targetHash) {
