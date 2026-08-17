@@ -51,7 +51,7 @@ The test infrastructure is segmented into three standalone simulation targets de
 
 ## 1. Execute proposed HRABAC O(1) Stress-Test
 
-Validates the flat execution baseline of exactly 38,851 gas across database depths expanding exponentially from 1 to 10,000 live storage items.
+Validates the flat execution baseline of exactly 38,820 gas across database depths expanding exponentially from 1 to 10,000 live storage items.
 
 ```shell
 npx hardhat test test/HRABACBenchmarks.ts
@@ -100,7 +100,7 @@ npx hardhat test test/ABACBenchmarks.ts
 |---|---|---|---|---|
 | PureABAC | $\mathcal{O}(n)$ | 45,342 gas | 2,536,756 gas| Block Gas Limit DoS / Bricking |
 | PureRiskBAC | $\mathcal{O}(1)$ storage lookups | 44,273 gas | Not Evaluated (N/A) | False-Positive Operational Lockouts |
-| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 38,851 gas | 38,851 gas | None (Fully Immune) |
+| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 38,820 gas | 38,820 gas | None (Fully Immune) |
 
 ------------------------------
 

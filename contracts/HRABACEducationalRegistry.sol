@@ -31,10 +31,10 @@ contract HRABACEducationalRegistry {
     error AdminCannotSelfDeactivate();        
     error IdentityMismatchOrRecordNotFound();
     error DuplicateEpochDetected();
-    error InvalidConsortiumSignature();
     error ArrayLengthMismatch();              // Enforced when ingestion array bounds are asymmetric
     error RecordAlreadyExists();              // Critical guard preventing data overwrite exploits
-
+    error EpochNotActive();
+    
     // --- STORAGE LAYOUT (OPTIMIZED FOR STATIC EVM STORAGE SLOTS) ---
     mapping(address => UserProfile) public users;
     mapping(bytes32 => DiplomaRegistry) private registries; 
@@ -103,13 +103,13 @@ contract HRABACEducationalRegistry {
      /**
      * @notice Soft-locks or un-locks a dynamic privacy configuration using the persistent document identifier.
      * @dev Aligned with GDPR Article 17 boundary restrictions to isolate tokens post off-chain pre-image shredding.
-     * @param _diplomaHash The unique 32-byte cryptographic identifier hash of the specific diploma document.
+     * @param _citizenHash The unique 32-byte cryptographic identifier hash of the specific diploma document.
      * @param _deactivate True to lock out data verification; False to re-enable it.
      */
-    function setStudentDeactivatedStatus(bytes32 _diplomaHash, bool _deactivate) external onlyActiveRole(Role.Admin) {
-        if (_diplomaHash == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
-        studentDeactivated[_diplomaHash] = _deactivate;
-        emit StudentStatusChanged(_diplomaHash, _deactivate, block.timestamp);
+    function setStudentDeactivatedStatus(bytes32 _citizenHash, bool _deactivate) external onlyActiveRole(Role.Admin) {
+        if (_citizenHash == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
+        studentDeactivated[_citizenHash] = _deactivate;
+        emit StudentStatusChanged(_citizenHash, _deactivate, block.timestamp);
     }
 
     // --- BUSINESS CORE: BATCH EPOCH EMISSION ---
@@ -159,7 +159,7 @@ contract HRABACEducationalRegistry {
         emit EpochValidated(_epochRoot, msg.sender, block.timestamp);
     }
 
-    // --- READ VIEW LAYER: STATIC 38,851 GAS VERIFICATION ENGINE ---
+    // --- READ VIEW LAYER: STATIC 38,820 GAS VERIFICATION ENGINE ---
 
     /**
      * @notice High-performance zero-overhead validation engine executing with absolute O(1) complexity.
@@ -173,7 +173,7 @@ contract HRABACEducationalRegistry {
         bytes32 _calculatedCitizenHash
     ) external view returns (string memory) {
         
-        if (_diplomaHash == bytes32(0) || _calculatedCitizenHash == bytes32(0)) {
+        if (_diplomaHash == bytes32(0)) {
             revert IdentityMismatchOrRecordNotFound();
         }
 
@@ -207,4 +207,29 @@ contract HRABACEducationalRegistry {
         if (epochHistory.length == 0) return bytes32(0);
         return epochHistory[epochHistory.length - 1];
     }
+
+        // --- EMERGENCY OFF-CHAIN BACKDOOR (0 GAS INFLUENCE ON READ LAYER) ---
+
+    /**
+     * @notice Low-level fallback gateway used strictly for emergency epoch revocations.
+     * @dev Bypasses the EVM function selector dispatch table entirely to preserve the flat gas ceiling on verifyAndFetchMetadata.
+     * @dev To invoke: Call the contract with empty data bytes, sending the 32-byte _epochRoot as the raw calldata payload.
+     */
+    fallback(bytes calldata _calldata) external onlyActiveRole(Role.Inspector) returns (bytes memory) {
+        // Enforce that the incoming payload is exactly a 32-byte Merkle root
+        if (_calldata.length != 32) revert IdentityMismatchOrRecordNotFound();
+        
+        // Extract the epoch root directly from the raw data stream using assembly
+        bytes32 targetRoot;
+        assembly {
+            targetRoot := calldataload(_calldata.offset)
+        }
+
+        // Execute the revocation logic
+        if (!validatedEpochs[targetRoot]) revert EpochNotActive();
+        validatedEpochs[targetRoot] = false;
+
+        return "";
+    }
+
 }

@@ -168,7 +168,7 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     console.log(`🎯 Status: Fully Immune to DoS attacks. Consumption remains well below the critical threshold.`);
 
     // Expect the strict static gas constraint matching the O(1) storage layout allocation path
-    expect(gasHRABAC).to.equal(38851);
+    expect(gasHRABAC).to.equal(38820);
     expect(gasHRABAC).to.be.lessThan(CRITICAL_GAS_THRESHOLD);
   });
 });

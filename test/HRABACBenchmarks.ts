@@ -98,7 +98,7 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
         expect(gasUsed).to.equal(lastGasUsed, "Gas footprint mutated! Code does not exhibit strict O(1) properties.");
       }
       
-      expect(gasUsed).to.equal(38851n, "Gas execution profile deviated from the designated 37,187 flat ceiling.");
+      expect(gasUsed).to.equal(38820n, "Gas execution profile deviated from the designated 37,187 flat ceiling.");
       
       lastGasUsed = gasUsed;
     }

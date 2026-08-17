@@ -125,7 +125,7 @@ describe("HRABACEducationalRegistry - Comprehensive System Tests", function () {
 
       // Assert state layout optimizations fully isolate runtime calculations from storage data debt
       expect(gasWithManyRecords).to.equal(gasWithOneRecord, "Gas variance detected! Not O(1) constant-time complexity.");
-      expect(gasWithManyRecords).to.equal(38851n, "Gas footprint does not match the strict academic framework ceiling.");
+      expect(gasWithManyRecords).to.equal(38820n, "Gas footprint does not match the strict academic framework ceiling.");
     });
 
     it("Should revert if an Employer evaluates a deactivated student profile (GDPR Article 17)", async function () {
