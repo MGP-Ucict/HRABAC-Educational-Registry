@@ -1,11 +1,11 @@
 import { defineConfig } from "hardhat/config";
-// Import the plugin definition object directly from the package
-import toolboxPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+// Hardhat 3 requires explicit plugin imports and configuration declaration
+import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 
 export default defineConfig({
-  // FIX: Pass the imported plugin definition object instead of a raw string
+  // FIX: Plugins must be explicitly passed in Hardhat 3
   plugins: [
-    toolboxPlugin
+    hardhatToolboxMochaEthers
   ],
 
   solidity: {
@@ -26,7 +26,6 @@ export default defineConfig({
     },
   },
   
-  // Explicitly mapping the test environment directories for the Mocha runner
   paths: {
     sources: "./contracts",
     tests: "./test",

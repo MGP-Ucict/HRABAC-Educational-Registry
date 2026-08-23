@@ -1,19 +1,19 @@
 import { expect } from "chai";
 import hre from "hardhat"; 
 
-describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
+describe("RegHRABACEducationalRegistry - Gas Benchmark O(1)", function () {
   let registry: any;
   let admin: any, inspector: any, employer: any;
-  let ethers: any; 
+  let ethersCtx: any; 
 
   beforeEach(async function () {
     const connection = await hre.network.create();
-    ethers = connection.ethers;
+    ethersCtx = connection.ethers;
 
-    const signers = await ethers.getSigners();
+    const signers = await ethersCtx.getSigners();
     [admin, inspector, employer] = signers; 
 
-    const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
+    const RegistryFactory = await ethersCtx.getContractFactory("RegHRABACEducationalRegistry");
     registry = await RegistryFactory.deploy(admin.address); 
     await registry.waitForDeployment();
     
@@ -21,27 +21,26 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
   });
 
   it("Should prove O(1) complexity by checking gas cost with increasing data volume", async function () {
+    // Array specifying the data points to evaluate nationwide infrastructure scale inflation
     const dataSizes = [1, 10, 50, 100, 200, 1000, 10000]; 
     let lastGasUsed: bigint | null = null;
     this.timeout(480000); // 8-minute safety window for high volume generation
     
-    const targetDiplomaHash = ethers.id("Target_Academic_Diploma_2026");
+    const targetDiplomaHash = ethersCtx.id("Target_Academic_Diploma_2026");
     
-    const packedSecretBytes = ethers.concat([
-      ethers.toUtf8Bytes("John Doe"),
-      ethers.toUtf8Bytes("004515XXXX")
+    const packedSecretBytes = ethersCtx.concat([
+      ethersCtx.toUtf8Bytes("John Doe"),
+      ethersCtx.toUtf8Bytes("004515XXXX")
     ]);
-    const targetCitizenHash = ethers.keccak256(packedSecretBytes);
+    const targetCitizenHash = ethersCtx.keccak256(packedSecretBytes);
     
-    const targetPayload = "Encrypted_University_Sofia_Computer_Science_Excellent_5.80";
-    const initialEpochRoot = ethers.id("Initial_Epoch_Root_000");
+    const initialEpochRoot = ethersCtx.id("Initial_Epoch_Root_000");
     
-    // Seed database with the legitimate target record
+    // Seed database with the legitimate target record using exactly 3 arguments (Zero-PII Architecture)
     await registry.connect(inspector).emitEpochState(
       initialEpochRoot, 
       [targetDiplomaHash], 
-      [targetCitizenHash], 
-      [targetPayload]
+      [targetCitizenHash]
     );
 
     console.log("\n--- START GAS BENCHMARK ---");
@@ -51,30 +50,27 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
     for (let size of dataSizes) {
       let itemsToAdd = size - currentCount;
 
-      // FIX: Разбиване на големите партиди на под-партиди от макс 200 елемента за избягване на Block Gas Limit DoS
-      const CHUNK_SIZE = 200;
+      // Split large scale emissions into safe sub-batches to prevent Block Gas Limit anomalies
+      const CHUNK_SIZE = 100;
       let batchCounter = 0;
 
       while (itemsToAdd > 0) {
         const currentChunkSize = Math.min(itemsToAdd, CHUNK_SIZE);
         const fakeDiplomaHashes: string[] = [];
         const fakeCitizenHashes: string[] = [];
-        const fakePayloads: string[] = [];
-        const loopEpochRoot = ethers.id(`Epoch_Root_Size_${size}_Batch_${batchCounter}`);
+        const loopEpochRoot = ethersCtx.id(`Epoch_Root_Size_${size}_Batch_${batchCounter}`);
 
         for (let i = 0; i < currentChunkSize; i++) {
           // Generate unique identities per block entry
-          fakeDiplomaHashes.push(ethers.id(`Fake_Diploma_Hash_${size}_${currentCount}_${i}`));
-          fakeCitizenHashes.push(ethers.id(`Fake_Citizen_Hash_${size}_${currentCount}_${i}`));
-          fakePayloads.push("Fake_Metadata_Payload");
+          fakeDiplomaHashes.push(ethersCtx.id(`Fake_Diploma_Hash_${size}_${currentCount}_${i}`));
+          fakeCitizenHashes.push(ethersCtx.id(`Fake_Citizen_Hash_${size}_${currentCount}_${i}`));
         }
 
-        // Commit safe segmented slice to the EVM state
+        // Commit safe segmented slice to the EVM state using the correct 3-parameter signature
         const tx = await registry.connect(inspector).emitEpochState(
           loopEpochRoot,
           fakeDiplomaHashes,
-          fakeCitizenHashes,
-          fakePayloads
+          fakeCitizenHashes
         );
         await tx.wait();
 
@@ -86,7 +82,7 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
       // Execute static view evaluation check - This remains perfectly flat O(1)
       const gasUsed: bigint = await registry
         .connect(employer)
-        .getFunction("verifyAndFetchMetadata")
+        .getFunction("verifyDiploma")
         .estimateGas(
           targetDiplomaHash, 
           targetCitizenHash
@@ -98,7 +94,8 @@ describe("HRABACEducationalRegistry - Gas Benchmark O(1)", function () {
         expect(gasUsed).to.equal(lastGasUsed, "Gas footprint mutated! Code does not exhibit strict O(1) properties.");
       }
       
-      expect(gasUsed).to.equal(38820n, "Gas execution profile deviated from the designated 37,187 flat ceiling.");
+      // Asserts that the verification path respects the strict academic framework flat ceiling
+      expect(gasUsed).to.equal(29334n, "Gas execution profile deviated from the designated flat ceiling.");
       
       lastGasUsed = gasUsed;
     }

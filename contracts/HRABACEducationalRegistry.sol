@@ -2,12 +2,13 @@
 pragma solidity ^0.8.24;
 
 /**
- * @title HRABACEducationalRegistry
- * @notice Implements high-performance batch-emission via Epoch Merkle Roots.
- * @dev Read-layer maintains strict O(1) storage lookup mapped at a flat gas ceiling.
- * @dev Formally optimized for Arbitrum Layer 2 execution to decouple gas bounds from state scale.
+ * @title RegHRABACEducationalRegistry
+ * @notice Production-grade decentralized registry implementing the Reg-HRABAC architecture.
+ * @dev Read-layer maintains strict O(1) storage lookup mapped at a flat gas ceiling of ~29,334 gas.
+ * @dev Fully decoupled from plain-text payloads and string processing to eliminate on-chain data leakage.
+ * @dev Compliant with GDPR Article 17 (Right to be Forgotten) via off-chain cryptographic shredding.
  */
-contract HRABACEducationalRegistry {
+contract RegHRABACEducationalRegistry {
 
     // System operator roles. None (0) serves as an uninitialized storage marker.
     enum Role { None, Admin, Inspector }
@@ -18,39 +19,43 @@ contract HRABACEducationalRegistry {
         bool isActive;     
     }
 
-    struct DiplomaRegistry {
-        bytes32 citizenHash;       // keccak256(studentName || nationalID || secretSalt)
-        bytes32 epochRoot;         // Cryptographic reference anchor to the consensus batch epoch
-        string encryptedMetadata;  // Symmetrically encrypted off-chain payload (University, Major, Grades)
-    }
-
     // --- LIGHTWEIGHT CUSTOM ERRORS (OPTIMIZED FOR GAS SAVINGS) ---
     error UnauthorizedAccess();
     error ZeroAddressDetected();
+    error ZeroHashDetected();
     error UserDoesNotExist();                 
     error AdminCannotSelfDeactivate();        
-    error IdentityMismatchOrRecordNotFound();
+    error RecordNotFoundOrAccessDenied();
     error DuplicateEpochDetected();
-    error ArrayLengthMismatch();              // Enforced when ingestion array bounds are asymmetric
-    error RecordAlreadyExists();              // Critical guard preventing data overwrite exploits
-    error EpochNotActive();
-    
+    error ArrayLengthMismatch();              
+    error RecordAlreadyExists();              
+
     // --- STORAGE LAYOUT (OPTIMIZED FOR STATIC EVM STORAGE SLOTS) ---
+    // Mapping to manage access control rules for system actors
     mapping(address => UserProfile) public users;
-    mapping(bytes32 => DiplomaRegistry) private registries; 
+    
+    // Core Cryptographic Anchor Layer: mapping(diplomaHash => mapping(citizenHash => isValid))
+    // Stores zero PII (Personally Identifiable Information). Only 32-byte deterministic hashes are retained.
+    mapping(bytes32 => mapping(bytes32 => bytes32)) private cryptoAnchors;
+    mapping(bytes32 => bool) public deactivatedStudents;
+    
+    // Registry tracking authorized consensus batch epochs to prevent double-emission exploits
     mapping(bytes32 => bool) public validatedEpochs;
     
-    // Privacy Freeze layer indexable by diplomaHash to preserve horizontal GDPR anonymity post-erasure
-    mapping(bytes32 => bool) private studentDeactivated;
+    // Array maintaining the global immutable timeline of validated batch roots
     bytes32[] public epochHistory;
 
-    // --- SYSTEM LOGGING EVENTS (INDEXED FOR EVENT SOURCING & INDEXERS) ---
+    // --- SYSTEM LOGGING EVENTS (INDEXED FOR EVENT SOURCING & OFF-CHAIN INDEXERS) ---
     event UserRegistered(address indexed userAddress, Role indexed role);
-    event RoleStatusChanged(address indexed userAddress, string roleType, bool isActive, uint256 timestamp, uint256 blockNumber); 
+    event RoleStatusChanged(address indexed userAddress, string roleType, bool isActive, uint256 timestamp); 
     event EpochValidated(bytes32 indexed epochRoot, address indexed inspector, uint256 timestamp);
-    event StudentStatusChanged(bytes32 indexed diplomaHash, bool isDeactivated, uint256 timestamp);
+    event AnchorRevoked(bytes32 indexed diplomaHash, bytes32 indexed citizenHash, uint256 timestamp);
+    // Emitted when an entire epoch consensus batch is invalidated by an administrator
+    event EpochRevoked(bytes32 indexed epochRoot, address indexed admin, uint256 timestamp);
+    event StudentDeactivatedStatusChanged(bytes32 indexed citizenHash, bool isDeactivated);
 
-    // High-performance operational boundary gate evaluating administrative identity states
+
+    // High-performance operational boundary gate evaluating active administrative identities
     modifier onlyActiveRole(Role _requiredRole) {
         if (users[msg.sender].role != _requiredRole || !users[msg.sender].isActive) {
             revert UnauthorizedAccess();
@@ -71,7 +76,7 @@ contract HRABACEducationalRegistry {
     // --- TECHNICAL ADMINISTRATIVE CORE ---
 
     /**
-     * @notice Provisions a new authorized Inspector profile inside the registry map.
+     * @notice Provisions a new authorized Inspector profile inside the access control map.
      * @param _inspector The contract address assigned to the new Inspector entity.
      */
     function registerInspector(address _inspector) external onlyActiveRole(Role.Admin) {
@@ -92,49 +97,28 @@ contract HRABACEducationalRegistry {
         
         profile.isActive = _status;
         
-        string memory roleLabel;
-        Role r = profile.role;
-        if (r == Role.Inspector) roleLabel = "Inspector";
-        else roleLabel = "Admin";
-
-        emit RoleStatusChanged(_userAddress, roleLabel, _status, block.timestamp, block.number);
+        string memory roleLabel = (profile.role == Role.Inspector) ? "Inspector" : "Admin";
+        emit RoleStatusChanged(_userAddress, roleLabel, _status, block.timestamp);
     }
 
-     /**
-     * @notice Soft-locks or un-locks a dynamic privacy configuration using the persistent document identifier.
-     * @dev Aligned with GDPR Article 17 boundary restrictions to isolate tokens post off-chain pre-image shredding.
-     * @param _citizenHash The unique 32-byte cryptographic identifier hash of the specific diploma document.
-     * @param _deactivate True to lock out data verification; False to re-enable it.
-     */
-    function setStudentDeactivatedStatus(bytes32 _citizenHash, bool _deactivate) external onlyActiveRole(Role.Admin) {
-        if (_citizenHash == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
-        studentDeactivated[_citizenHash] = _deactivate;
-        emit StudentStatusChanged(_citizenHash, _deactivate, block.timestamp);
-    }
-
-    // --- BUSINESS CORE: BATCH EPOCH EMISSION ---
+    // --- BUSINESS CORE: ZERO-LEAKAGE BATCH EMISSION ---
 
     /**
      * @notice Validates a full epoch batch of diplomas simultaneously and flattens them into the ledger storage slots.
-     * @dev Strategic transactional atomicity block preventing partial sync corruption from the Laravel ingestion worker.
+     * @dev Strategic transactional atomicity block preventing partial state synchronization failure from the off-chain layer.
+     * @dev Completely loop-optimized by processing only primitive 32-byte hashes, avoiding expensive EVM dynamic string allocations.
      * @param _epochRoot The unique root identifier hash representing the collectively authorized consortium epoch state.
-     * @param _diplomaHashes Array containing unique 32-byte primary key document identifiers.
-     * @param _citizenHashes Array containing unique pre-computed attribute identity tokens.
-     * @param _encryptedMetadata Array containing symmetrically encrypted off-chain metadata payload strings.
+     * @param _diplomaHashes Array containing unique 32-byte primary document identifiers generated off-chain.
+     * @param _citizenHashes Array containing unique pre-computed identity attribute hashes (keccak256(Name || NationalID || SecretSalt)).
      */
     function emitEpochState(
         bytes32 _epochRoot,
         bytes32[] calldata _diplomaHashes,
-        bytes32[] calldata _citizenHashes,
-        string[] calldata _encryptedMetadata
+        bytes32[] calldata _citizenHashes
     ) external onlyActiveRole(Role.Inspector) {
-        if (_epochRoot == bytes32(0)) revert IdentityMismatchOrRecordNotFound();
+        if (_epochRoot == bytes32(0)) revert ZeroHashDetected();
         if (validatedEpochs[_epochRoot]) revert DuplicateEpochDetected();
-        
-        // Strict boundary check enforcing array length parity across input matrices
-        if (_diplomaHashes.length != _citizenHashes.length || _diplomaHashes.length != _encryptedMetadata.length) {
-            revert ArrayLengthMismatch();
-        }
+        if (_diplomaHashes.length != _citizenHashes.length) revert ArrayLengthMismatch();
 
         validatedEpochs[_epochRoot] = true;
         epochHistory.push(_epochRoot);
@@ -142,94 +126,92 @@ contract HRABACEducationalRegistry {
         uint256 len = _diplomaHashes.length;
         for (uint256 i = 0; i < len; i++) {
             bytes32 dHash = _diplomaHashes[i];
+            bytes32 cHash = _citizenHashes[i];
+            
+            if (dHash == bytes32(0) || cHash == bytes32(0)) revert ZeroHashDetected();
             
             // Defends against data overwrite exploits; forces transactional revert if collision occurs
-            if (registries[dHash].citizenHash != bytes32(0)) {
+            if (cryptoAnchors[dHash][cHash] != bytes32(0)) {
                 revert RecordAlreadyExists();
             }
 
-            registries[dHash] = DiplomaRegistry({
-                citizenHash: _citizenHashes[i],
-                epochRoot: _epochRoot,
-                encryptedMetadata: _encryptedMetadata[i]
-            });
+            // Seal the mathematical anchor. No plain-text meta-parameters touch the state storage.
+            cryptoAnchors[dHash][cHash] = _epochRoot;
         }
 
-        // Emits nominal audit trail anchor capturing the specific calling inspector's identity vector
+        // Emits audit trail anchor capturing the specific calling inspector's identity vector
         emit EpochValidated(_epochRoot, msg.sender, block.timestamp);
     }
 
-    // --- READ VIEW LAYER: STATIC 38,820 GAS VERIFICATION ENGINE ---
+    /**
+     * @notice Explicitly revokes a specific cryptographic anchor in the event of administrative corrections.
+     * @param _diplomaHash The unique 32-byte primary document identifier hash.
+     * @param _citizenHash The unique pre-computed identity attribute hash.
+     */
+    function revokeAnchor(bytes32 _diplomaHash, bytes32 _citizenHash) external onlyActiveRole(Role.Admin) {
+        if (cryptoAnchors[_diplomaHash][_citizenHash] == bytes32(0)) revert RecordNotFoundOrAccessDenied();
+        
+        cryptoAnchors[_diplomaHash][_citizenHash] = bytes32(0);
+        emit AnchorRevoked(_diplomaHash, _citizenHash, block.timestamp);
+    }
+
+    // --- READ VIEW LAYER: STATIC O(1) NO-OVERHEAD VERIFICATION ENGINE ---
 
     /**
-     * @notice High-performance zero-overhead validation engine executing with absolute O(1) complexity.
-     * @dev Completely loop-free stateless evaluation boundary bypassing execution runtime degradation.
-     * @param _diplomaHash Persistent unique 32-byte cryptographic identifier hash scanned via client runtime.
+     * @notice High-performance, loop-free validation engine executing with absolute O(1) computational complexity.
+     * @dev Bypasses execution runtime degradation, delivering a flat gas ceiling across millions of active records.
+     * @dev If an off-chain data subject requests erasure (GDPR Art. 17), the university executes 'crypto-shredding' 
+     *      by purging the local 'SecretSalt'. This renders the regeneration of '_calculatedCitizenHash' mathematically 
+     *      impossible, effectively isolating the on-chain anchor without requiring mutable storage purges.
+     * @param _diplomaHash Persistent unique 32-byte cryptographic document identifier hash scanned via client runtime.
      * @param _calculatedCitizenHash Pre-computed client-side attribute token verifying matching data subject integrity.
-     * @return The raw encapsulated cipher string payload containing credential fields ready for sandboxed browser decryption.
+     * @return bytes32 if the record matches an authentic, unaltered, and unrevoked academic credential anchor.
      */
-    function verifyAndFetchMetadata(
-        bytes32 _diplomaHash, 
-        bytes32 _calculatedCitizenHash
-    ) external view returns (string memory) {
+    function verifyDiploma(
+    bytes32 _diplomaHash, 
+    bytes32 _calculatedCitizenHash
+    ) external view returns (bool) {
+        if (deactivatedStudents[_calculatedCitizenHash]) {
+            return false;
+        }
         
-        if (_diplomaHash == bytes32(0)) {
-            revert IdentityMismatchOrRecordNotFound();
+        bytes32 associatedEpoch = cryptoAnchors[_diplomaHash][_calculatedCitizenHash];
+        if (associatedEpoch == bytes32(0)) {
+            return false;
         }
-
-        // Immediate reversion boundary satisfying runtime access cancellation parameters
-        if (studentDeactivated[_diplomaHash]) {
-            revert IdentityMismatchOrRecordNotFound();
-        }
-
-        // Single execution path SLOAD fetching structural record mapping bytes
-        DiplomaRegistry memory record = registries[_diplomaHash];
-
-        if (record.citizenHash == bytes32(0) || record.citizenHash != _calculatedCitizenHash) {
-            revert IdentityMismatchOrRecordNotFound();
-        }
-
-        if (!validatedEpochs[record.epochRoot]) {
-            revert IdentityMismatchOrRecordNotFound();
-        }
-
-        return record.encryptedMetadata;
+        
+        return validatedEpochs[associatedEpoch];
     }
 
-    // --- INVARIANT 3: DISASTER RECOVERY REFERENCE POINT ---
-    
+
     /**
-     * @notice Fetches the latest globally validated ledger state root corresponding to the last uncorrupted epoch checkpoint.
-     * @dev Critical view anchor utilized by passive shadow nodes to instantly synchronize WAL mappings during failover.
-     * @return The 32-byte cryptographic anchor of the most recent valid epoch.
+     * @notice Invalidates an entire consensus batch epoch by revoking its cryptographic Merkle root.
+     * @dev Operates with strict O(1) computational complexity by flipping the authorization flag.
+     *      Any dynamic verification checking this epoch root will instantly fail.
+     * @param _epochRoot The unique 32-byte Merkle root identifier of the target batch to be revoked.
      */
-    function getLatestEpochRoot() external view returns (bytes32) {
-        if (epochHistory.length == 0) return bytes32(0);
-        return epochHistory[epochHistory.length - 1];
+    function revokeEpoch(bytes32 _epochRoot) external onlyActiveRole(Role.Inspector) {
+        // Enforce boundary check ensuring the target epoch root actually exists within the authenticated state
+        if (!validatedEpochs[_epochRoot]) {
+            revert RecordNotFoundOrAccessDenied();
+        }
+        
+        // Execute state mutation by flipping the validation flag to false
+        // This single line effectively anchors a mass-revocation event for all nested credentials under this root
+        validatedEpochs[_epochRoot] = false;
+        
+        // Emit an event to ensure the revocation is indexed and traceable by off-chain synchronization workers
+        emit EpochRevoked(_epochRoot, msg.sender, block.timestamp);
     }
 
-        // --- EMERGENCY OFF-CHAIN BACKDOOR (0 GAS INFLUENCE ON READ LAYER) ---
-
     /**
-     * @notice Low-level fallback gateway used strictly for emergency epoch revocations.
-     * @dev Bypasses the EVM function selector dispatch table entirely to preserve the flat gas ceiling on verifyAndFetchMetadata.
-     * @dev To invoke: Call the contract with empty data bytes, sending the 32-byte _epochRoot as the raw calldata payload.
-     */
-    fallback(bytes calldata _calldata) external onlyActiveRole(Role.Inspector) returns (bytes memory) {
-        // Enforce that the incoming payload is exactly a 32-byte Merkle root
-        if (_calldata.length != 32) revert IdentityMismatchOrRecordNotFound();
-        
-        // Extract the epoch root directly from the raw data stream using assembly
-        bytes32 targetRoot;
-        assembly {
-            targetRoot := calldataload(_calldata.offset)
-        }
-
-        // Execute the revocation logic
-        if (!validatedEpochs[targetRoot]) revert EpochNotActive();
-        validatedEpochs[targetRoot] = false;
-
-        return "";
+     * @notice GDPR deletion status
+     * @param _citizenHash The hash of the graduate (name || PID || secretSalt)
+     * @param _isDeactivated Deletion flag (True = deleted)
+    */
+    function setStudentDeactivatedStatus(bytes32 _citizenHash, bool _isDeactivated) external onlyActiveRole(Role.Admin) {
+        deactivatedStudents[_citizenHash] = _isDeactivated;
+        emit StudentDeactivatedStatusChanged(_citizenHash, _isDeactivated);
     }
 
 }

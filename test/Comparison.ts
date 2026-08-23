@@ -4,27 +4,27 @@ import hre from "hardhat";
 describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", function () {
   let abac: any, riskBac: any, hrabac: any;
   let admin: any, inspector: any, employer: any, student: any;
-  let ethers: any;
+  let ethersCtx: any;
 
   // Security operational boundary threshold mapped inside the lab environment
   const CRITICAL_GAS_THRESHOLD = 120000; 
 
   beforeEach(async function () {
     const connection = await hre.network.create();
-    ethers = connection.ethers; 
+    ethersCtx = connection.ethers; 
     
-    const signers = await ethers.getSigners();
+    const signers = await ethersCtx.getSigners();
     [admin, inspector, employer, student] = signers;
 
     // 1. DEPLOY CONTRACTS
-    const PureRiskBACFactory = await ethers.getContractFactory("AdaptedRiskBAC");
+    const PureRiskBACFactory = await ethersCtx.getContractFactory("AdaptedRiskBAC");
     riskBac = await PureRiskBACFactory.deploy(inspector.address);
 
-    const PureABACFactory = await ethers.getContractFactory("PureABAC");
+    const PureABACFactory = await ethersCtx.getContractFactory("PureABAC");
     abac = await PureABACFactory.deploy(admin.address);
 
-    // FIX: Target the updated architectural contract name
-    const RegistryFactory = await ethers.getContractFactory("HRABACEducationalRegistry");
+    // TARGET: Deploy the updated architectural zero-PII contract name
+    const RegistryFactory = await ethersCtx.getContractFactory("RegHRABACEducationalRegistry");
     hrabac = await RegistryFactory.deploy(admin.address); 
       
     await abac.waitForDeployment();
@@ -40,8 +40,8 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
 
   // --- DEMONSTRATION 1: PureRiskBAC Operational Lockout (Logical Failure) ---
   it("PureRiskBAC undergoes operational lockout for the user after failed authentication attempts", async function () {
-    const targetDiplomaHash = ethers.id("Real_Diploma_Hash");
-    const targetCitizenHash = ethers.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
+    const targetDiplomaHash = ethersCtx.id("Real_Diploma_Hash");
+    const targetCitizenHash = ethersCtx.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
     const targetPayload = "Encrypted_University_Sofia_Computer_Science_Excellent_5.80";
     
     await riskBac.connect(inspector).addDiploma(targetDiplomaHash, targetCitizenHash, 30, targetPayload);
@@ -78,8 +78,8 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
 
   // --- DEMONSTRATION 2: PureABAC Gas Explosion (O(N) Storage DoS Vulnerability) ---
   it("PureABAC violates the critical gas threshold and triggers an automatic execution failure", async function () {
-    const targetDiplomaHash = ethers.id("Target_Hash_ABAC");
-    const targetCitizenHash = ethers.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
+    const targetDiplomaHash = ethersCtx.id("Target_Hash_ABAC");
+    const targetCitizenHash = ethersCtx.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
 
     console.log("\n--- SIMULATING GAS EXPLOSION (DoS) IN PUREABAC ---");
     
@@ -87,8 +87,8 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     console.log(`⏳ Injecting ${recordsToInject} fake entries to induce worst-case loop traversal inside PureABAC...`);
     
     for (let i = 0; i < recordsToInject; i++) {
-      const fakeDiplomaHash = ethers.id(`Fake_Diploma_Hash_${i}`);
-      const fakeCitizenHash = ethers.id(`Fake_Citizen_Hash_${i}`);
+      const fakeDiplomaHash = ethersCtx.id(`Fake_Diploma_Hash_${i}`);
+      const fakeCitizenHash = ethersCtx.id(`Fake_Citizen_Hash_${i}`);
       
       await abac.connect(admin).addDiploma(
         fakeDiplomaHash, 
@@ -108,7 +108,7 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
     const finalGasABAC = Number(
       await abac.connect(employer).verifyDiplomaABAC.estimateGas(targetDiplomaHash, targetCitizenHash)
     );
-    console.log(`⛽ Measured EVM gas overhead for PureABAC: ${finalGasABAC} units`);
+    console.log(`%Measured EVM gas overhead for PureABAC: ${finalGasABAC} units`);
     console.log(`🛡️ Defined Critical Safety Margin: ${CRITICAL_GAS_THRESHOLD} units`);
 
     if (finalGasABAC > CRITICAL_GAS_THRESHOLD) {
@@ -122,53 +122,47 @@ describe("🛑 Critical Vulnerability and Block Gas Limit DoS Demonstration", fu
 
   // --- DEMONSTRATION 3: HRABAC Deterministic Immunity under identical strain ---
   it("HRABAC maintains constant O(1) performance under identical storage strain with no gas fluctuations", async function () {
-    const targetDiplomaHash = ethers.id("Target_Hash_HRABAC");
-    const targetCitizenHash = ethers.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
-    const targetPayload = "Encrypted_University_Sofia_Computer_Science_Excellent_5.80";
+    const targetDiplomaHash = ethersCtx.id("Target_Hash_HRABAC");
+    const targetCitizenHash = ethersCtx.solidityPackedKeccak256(["string", "string"], ["John Doe", "004515XXXX"]);
 
     console.log("\n--- VERIFYING HRABAC ALGORITHMIC INVARIANCE ---");
     
     const recordsToInject = 150;
-    const fakeEpochRoot = ethers.id("Epoch_Root_DoS_Simulation_099");
+    const fakeEpochRoot = ethersCtx.id("Epoch_Root_DoS_Simulation_099");
     const fakeDiplomaHashes: string[] = [];
     const fakeCitizenHashes: string[] = [];
-    const fakePayloads: string[] = [];
 
     // Compile dynamic fake elements for batch ingestion
     for (let i = 0; i < recordsToInject; i++) {
-      fakeDiplomaHashes.push(ethers.id(`Fake_HR_Diploma_${i}`));
-      fakeCitizenHashes.push(ethers.id(`Fake_MCP_Identity_${i}`));
-      fakePayloads.push("Fake_Encrypted_Payload");
+      fakeDiplomaHashes.push(ethersCtx.id(`Fake_HR_Diploma_${i}`));
+      fakeCitizenHashes.push(ethersCtx.id(`Fake_MCP_Identity_${i}`));
     }
 
-    // FIX: Inject structural load factors as an optimized atomic Epoch State Emission
+    // FIXED: Emitting epoch state using exactly 3 arguments to avoid ABI fragment mismatch
     await hrabac.connect(inspector).emitEpochState(
       fakeEpochRoot,
       fakeDiplomaHashes,
-      fakeCitizenHashes,
-      fakePayloads
+      fakeCitizenHashes
     );
 
-    // Commit the legitimate verification record in its own epoch block
-    const legitimateEpochRoot = ethers.id("Epoch_Root_Legitimate_100");
+    // Commit the legitimate verification record in its own epoch block (3 arguments)
+    const legitimateEpochRoot = ethersCtx.id("Epoch_Root_Legitimate_100");
     await hrabac.connect(inspector).emitEpochState(
       legitimateEpochRoot,
       [targetDiplomaHash],
-      [targetCitizenHash],
-      [targetPayload]
+      [targetCitizenHash]
     );
     
-    // Estimate gas execution profile over the updated view signature method
+    // Estimate gas execution profile over the optimized stateless view method
     const gasHRABAC = Number(
       await hrabac.connect(employer)
-        .getFunction("verifyAndFetchMetadata")
+        .getFunction("verifyDiploma")
         .estimateGas(targetDiplomaHash, targetCitizenHash)
     );
     console.log(`🟩 Measured EVM gas overhead for HRABAC following storage inflation: ${gasHRABAC} units`);
     console.log(`🎯 Status: Fully Immune to DoS attacks. Consumption remains well below the critical threshold.`);
 
-    // Expect the strict static gas constraint matching the O(1) storage layout allocation path
-    expect(gasHRABAC).to.equal(38820);
+    // FIXED: Dynamically assert that gas respects the safety threshold instead of matching an obsolete hardcoded floor
     expect(gasHRABAC).to.be.lessThan(CRITICAL_GAS_THRESHOLD);
   });
 });
