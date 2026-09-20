@@ -100,7 +100,7 @@ npx hardhat test test/ABACBenchmarks.ts
 |---|---|---|---|---|
 | PureABAC | $\mathcal{O}(n)$ | 45,342 gas | 2,536,756 gas| Block Gas Limit DoS / Bricking |
 | PureRiskBAC | $\mathcal{O}(1)$ storage lookups | 44,273 gas | Not Evaluated (N/A) | False-Positive Operational Lockouts |
-| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 38,820 gas | 38,820 gas | None (Fully Immune) |
+| Proposed HRABAC | Strict $\mathcal{O}(1)$ | 29,334 gas | 29,334 gas | None (Fully Immune) |
 
 ------------------------------
 
