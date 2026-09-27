@@ -34,7 +34,6 @@ contract RegHRABACEducationalRegistry {
     // Mapping to manage access control rules for system actors
     mapping(address => UserProfile) public users;
     
-    // Core Cryptographic Anchor Layer: mapping(diplomaHash => mapping(citizenHash => isValid))
     // Stores zero PII (Personally Identifiable Information). Only 32-byte deterministic hashes are retained.
     mapping(bytes32 => mapping(bytes32 => bytes32)) private cryptoAnchors;
     mapping(bytes32 => bool) public deactivatedStudents;
